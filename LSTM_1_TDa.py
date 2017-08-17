@@ -4,7 +4,7 @@ from random import shuffle
 import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
 from keras.utils import plot_model
-from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional
+from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional, BatchNormalization
 from keras.initializers import lecun_normal,glorot_normal
 from keras.optimizers import rmsprop
 from keras import metrics
@@ -22,7 +22,7 @@ import sklearn.preprocessing
 
 #you limit the # of calls keras calls the generator OUTSIDE the generator.
 #each time you fit, dataset length // batch size. round down!
-def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scaled=True,scaler_type = 'standard',scale_what = 'data'): #shape is something like 1, 11520, 11
+def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data'): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -110,10 +110,14 @@ shuffle(combined_filenames)
 print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 
 #define the model first
+#TODO: check if model runs just fine with the batch norm layers
 a = Input(shape=(None,11))
 b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(a)
+#b = BatchNormalization(name='bn_between_lstm')(b)
 c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(b)
+#c = BatchNormalization(name='bn_after_last_lstm')(c)
 d = TimeDistributed(Dense(64,activation='elu',kernel_initializer=lecun_normal(seed=1337)))(c)
+#d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
 keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
@@ -150,7 +154,7 @@ if weights_present_indicator == False:
         print("filename: {}, data/label shape: {}, {}, draw #: {}".format(str(files[0]),train_array.shape,label_array.shape, i))
 
         generator_starting_index = train_array.shape[1] - 1 - shortest_length #steps per epoch is how many times that generator is called #train_array.shape[0]//generator_batch_size
-        training_hist = model.fit_generator(np_array_pair_generator(train_array,label_array,start_at=0,generator_batch_size=generator_batch_size),epochs=num_epochs,steps_per_epoch=3*(train_array.shape[0]//generator_batch_size),verbose=2)
+        training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size), epochs=num_epochs, steps_per_epoch=3 * (train_array.shape[0] // generator_batch_size), verbose=2)
 
     #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
     if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
@@ -243,7 +247,7 @@ if weights_present_indicator == True:
         predictions_length = generator_batch_size * (label_array.shape[0]//generator_batch_size)
         #largest integer multiple of the generator batch size that fits into the length of the sequence.
 
-        test_generator = np_array_pair_generator(test_array, label_array, start_at = 0,generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size)
         row_dict = {}
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
                                          max_queue_size=test_array.shape[0], use_multiprocessing=False)

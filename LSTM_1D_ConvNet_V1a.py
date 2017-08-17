@@ -20,30 +20,29 @@ import sklearn.preprocessing
 
 # np.set_printoptions(threshold='nan')
 
-def conv_block_a(i=0):
+def conv_block_a(i=0, j=0):
     '''the "twice the number of parameters"  branch'''
     a = Input(shape=(None, 1))
-    b = Conv1D(32, kernel_size=(8), padding='valid', activation='elu')(a)
+    b = Conv1D(32, kernel_size=(8), padding='valid', activation='elu',name=('Conv1_'+str(i)+'_'+str(j)))(a)
     # c1 = MaxPooling1D((2))(b1)
-    d = Conv1D(16, kernel_size=(8), padding='valid', activation='elu')(b)
-    e = Conv1D(8, kernel_size=(8), padding='valid', activation='elu')(d)
-    f = Conv1D(8, kernel_size=(8), padding='valid', activation='elu')(e)
+    d = Conv1D(16, kernel_size=(8), padding='valid', activation='elu',name=('Conv2_'+str(i)+'_'+str(j)))(b)
+    e = Conv1D(8, kernel_size=(8), padding='valid', activation='elu',name=('Conv3_'+str(i)+'_'+str(j)))(d)
+    f = Conv1D(8, kernel_size=(8), padding='valid', activation='elu',name=('Conv4_'+str(i)+'_'+str(j)))(e)
     g = Flatten()(f)
     #g = Dense(1, activation='elu')(f)
     return g
 
-def conv_block_b(i=0):
-    '''' "half the number of parameters" branch'''
+def conv_block_b(i=0,j=0): #half the number of parameters
     a = Input(shape=(None, 1))
     b = Conv1D(32, kernel_size=(8), padding='valid', activation='elu')(a)
     # c11 = MaxPooling1D((2))(b11)
     d = Conv1D(4, kernel_size=(8), padding='valid', activation='elu')(b)
-    # e11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d11)
-    # e11 = Flatten()(d11)
-    f = Dense(1, activation='elu')(d)
-    return f
+    # e11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d)
+    e = Flatten()(d)
+    #f = Dense(1, activation='selu')(d)
+    return e
 
-def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scaled=True,scaler_type = 'standard',scale_what = 'data'): #shape is something like 1, 11520, 11
+def pair_generator_conv1d(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data'): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -302,7 +301,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print("data/label shape: {}, {}, draw #: {}".format(train_array.shape,label_array.shape, i))
         # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
-        train_generator = np_array_pair_generator(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size)
+        train_generator = pair_generator_conv1d(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size)
         training_hist = model.fit_generator(train_generator, epochs=num_epochs, steps_per_epoch=3*(train_array.shape[0]//generator_batch_size), verbose=2)
 
 if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
@@ -349,7 +348,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print(files[0])
         # print("Metrics: {}".format(model.metrics_names))
         # steps per epoch is how many times that generator is called
-        test_generator = np_array_pair_generator(test_array, label_array, start_at = 0,generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_conv1d(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size)
         for i in range (1):
             X_test_batch, y_test_batch = test_generator.next()
             # print(X_test_batch)
@@ -364,7 +363,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
                    fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
                    footer=str(), comments='# ')
 
-        test_generator = np_array_pair_generator(test_array, label_array, start_at = 0,generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_conv1d(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size)
         prediction_length = (int(0.85*(generator_batch_size * (label_array.shape[0]//generator_batch_size))))
         test_i=0
         # Kindly declare the shape

@@ -7,7 +7,17 @@ import os
 import json
 import scattergro_utils as sg_utils
 import sklearn.preprocessing
+from scattergro_parser_each import parse_scattergro
 
+'''Characterizes sequences. Calculates the relevant statistics.'''
+
+#call parser
+parse_scattergro(analysis_mode = True, save_arrays = False, feature_identifier = 'fvx')
+
+
+
+
+'''
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
@@ -120,3 +130,4 @@ if weights_present_indicator == True:
     #score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
 
 
+'''

@@ -1,0 +1,1 @@
+'''placeholder for the eventual autoencoder.. the LSTM could use a few more descriptive features. '''
