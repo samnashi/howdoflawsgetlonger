@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
 from keras.utils import plot_model
 from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional, Dense, Dropout, \
-    Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate, BatchNormalization
+    Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate, BatchNormalization, \
+    UpSampling1D
 from keras.initializers import lecun_normal,glorot_normal
 from keras import metrics
 import pandas as pd
@@ -22,23 +23,26 @@ import sklearn.preprocessing
 
 def conv_block_normal_param_count(input_tensor,i=0):
     '''f means it's the normal param count branch'''
-    b = Conv1D(64, kernel_size=(64), padding='valid', activation='elu')(input_tensor)
+    b = Conv1D(64, kernel_size=(128), padding='valid', activation='elu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(16), padding='valid', activation='elu')(c)
+    d = Conv1D(32, kernel_size=(2), padding='valid', activation='elu')(c) #gives me 128x1
     e = BatchNormalization()(d)
-    f = Dense(1, activation='elu')(e)
-    return f
+    f = UpSampling1D(size=2)(e)
+    g = BatchNormalization()(f)
+    h = Dense(1)(g)
+    return h
 
 def conv_block_double_param_count(input_tensor,i=0):
     '''g means it's the output of the "twice the number of parameters"  branch'''
     b = Conv1D(128, kernel_size=(128), padding='valid', activation='elu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(64, kernel_size=(16), padding='valid', activation='elu')(c)
+    d = Conv1D(32, kernel_size=(2), padding='valid', activation='elu')(c) #gives me 128x1
     e = BatchNormalization()(d)
-    e = Conv1D(64, kernel_size=(4), padding='valid', activation='elu')(d)
-    f = BatchNormalization()(e)
-    g = Dense(4, activation='elu')(f)
-    return g
+    f = UpSampling1D(size=2)(e)
+    #f = Conv1D(64, kernel_size=(4), padding='valid', activation='elu')(e)
+    g = BatchNormalization()(f)
+    h = Dense(4)(g)
+    return h
 
 def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
@@ -296,12 +300,15 @@ f11 = conv_block_normal_param_count(input_tensor=a11)
 # #e11 = Flatten()(d11)
 # f11 = Dense(1, activation='elu')(d11)
 
-g = concatenate([g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11])
+tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
+g = concatenate(tensors_to_concat)
 h = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(g)
 i = BatchNormalization()(h)
 j = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(i)
+j = BatchNormalization()(j)
 k = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337), activation='elu'))(j)
 l = Dense(16,activation='elu')(k)
+l = BatchNormalization()(l)
 out = Dense(4)(l)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
