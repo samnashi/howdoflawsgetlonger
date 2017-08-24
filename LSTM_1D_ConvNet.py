@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
 from keras.utils import plot_model
 from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional, Dense, Dropout, \
-    Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate
+    Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate, BatchNormalization
 from keras.initializers import lecun_normal,glorot_normal
 from keras import metrics
 import pandas as pd
@@ -20,30 +20,27 @@ import sklearn.preprocessing
 
 # np.set_printoptions(threshold='nan')
 
-def conv_block_a(i=0):
-    '''the "twice the number of parameters"  branch'''
-    a = Input(shape=(None, 1))
-    b = Conv1D(32, kernel_size=(8), padding='valid', activation='elu')(a)
-    # c1 = MaxPooling1D((2))(b1)
-    d = Conv1D(16, kernel_size=(8), padding='valid', activation='elu')(b)
-    e = Conv1D(8, kernel_size=(8), padding='valid', activation='elu')(d)
-    f = Conv1D(8, kernel_size=(8), padding='valid', activation='elu')(e)
-    g = Flatten()(f)
-    #g = Dense(1, activation='elu')(f)
-    return g
-
-def conv_block_b(i=0):
-    '''' "half the number of parameters" branch'''
-    a = Input(shape=(None, 1))
-    b = Conv1D(32, kernel_size=(8), padding='valid', activation='elu')(a)
-    # c11 = MaxPooling1D((2))(b11)
-    d = Conv1D(4, kernel_size=(8), padding='valid', activation='elu')(b)
-    # e11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d11)
-    # e11 = Flatten()(d11)
-    f = Dense(1, activation='elu')(d)
+def conv_block_normal_param_count(input_tensor,i=0):
+    '''f means it's the normal param count branch'''
+    b = Conv1D(64, kernel_size=(64), padding='valid', activation='elu')(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(64, kernel_size=(16), padding='valid', activation='elu')(c)
+    e = BatchNormalization()(d)
+    f = Dense(2, activation='elu')(e)
     return f
 
-def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scaled=True,scaler_type = 'standard',scale_what = 'data'): #shape is something like 1, 11520, 11
+def conv_block_double_param_count(input_tensor,i=0):
+    '''g means it's the output of the "twice the number of parameters"  branch'''
+    b = Conv1D(128, kernel_size=(64), padding='valid', activation='elu')(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(64, kernel_size=(16), padding='valid', activation='elu')(c)
+    e = BatchNormalization()(d)
+    e = Conv1D(64, kernel_size=(4), padding='valid', activation='elu')(d)
+    f = BatchNormalization()(e)
+    g = Dense(8, activation='elu')(f)
+    return g
+
+def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -55,7 +52,8 @@ def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scale
     if scaled == True:
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
-            #print('standard scaler initialized: {}'.format(scaler))
+            label_scaler = sklearn.preprocessing.StandardScaler()
+
         elif scaler_type == 'minmax':
             scaler = sklearn.preprocessing.MinMaxScaler()
         elif scaler_type == 'robust':
@@ -63,9 +61,23 @@ def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scale
         else:
             scaler = sklearn.preprocessing.StandardScaler()
         #print("scaled: {}, scaler_type: {}".format(scaled,scaler_type))
+
+    if use_precomputed_coeffs == True:
+        scaler.var_ = [1283.8767902599698, 0.6925742052047087, 0.016133766659421164,
+                       0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
+                       3.621824029181443, 0.03209691975648252, 43.47286356045491, 43.472882235044786]
+        scaler.mean_ = [77.84198603763824, 8.648004880708694, 0.5050077150656151,
+                        8.648146575144597, 1.2382993509098987, 9.737983474596277, 1.7792042443537548,
+                        9.737976755677462, 1.9832900698119342, 7.859076582026868, 7.859102808059667]
+        scaler.scale_ = [35.831226468821434, 0.8322104332467292, 0.12701876498935566, 0.8320954139194466, 0.1397616441751066, 1.9030479624833518, 0.1791326531325183, 1.9031090429035966, 0.1791561323440605, 6.593395450028377, 6.5933968661870175]
+        label_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
+        label_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
+        label_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
+        data_scaled = scaler.transform(X=data,y=None)
+        labels_scaled = label_scaler.transform(X=labels,y=None)
+    if use_precomputed_coeffs == False:
         data_scaled = scaler.fit_transform(X=data, y=None)
-        labels_scaled = scaler.fit_transform(X=labels, y=None) #i don't think you should scale the labels..
-        #labels_scaled = labels #don't scale the labels..
+        labels_scaled = scaler.fit_transform(X=labels, y=None)
         #--------i think expand dims is a lot less implicit, that's why i commented these out-------
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
@@ -123,31 +135,35 @@ def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scale
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 5 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 500 #how many times the training corpus is sampled.
+num_sequence_draws = 1000 #how many times the training corpus is sampled.
 generator_batch_size = 256
-generator_batch_size_valid_x1 = (generator_batch_size+28)#4layer conv
-generator_batch_size_valid_x2 = (generator_batch_size+14)
-generator_batch_size_valid_x3 = (generator_batch_size+28)#4layer conv
-generator_batch_size_valid_x4 = (generator_batch_size+14)
-generator_batch_size_valid_x5 = (generator_batch_size+28)#4layer conv
-generator_batch_size_valid_x6 = (generator_batch_size+14)
-generator_batch_size_valid_x7 = (generator_batch_size+28)#4layer conv
-generator_batch_size_valid_x8 = (generator_batch_size+14)
-generator_batch_size_valid_x9 = (generator_batch_size+14)
-generator_batch_size_valid_x10 = (generator_batch_size+14)
-generator_batch_size_valid_x11 = (generator_batch_size+14)
+generator_batch_size_valid_x1 = (generator_batch_size)#4layer conv
+generator_batch_size_valid_x2 = (generator_batch_size)
+generator_batch_size_valid_x3 = (generator_batch_size)#4layer conv
+generator_batch_size_valid_x4 = (generator_batch_size)
+generator_batch_size_valid_x5 = (generator_batch_size)#4layer conv
+generator_batch_size_valid_x6 = (generator_batch_size)
+generator_batch_size_valid_x7 = (generator_batch_size)#4layer conv
+generator_batch_size_valid_x8 = (generator_batch_size)
+generator_batch_size_valid_x9 = (generator_batch_size)
+generator_batch_size_valid_x10 = (generator_batch_size)
+generator_batch_size_valid_x11 = (generator_batch_size)
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # identifier = "_convlstm_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
-identifier = "_conv1d_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
+identifier = "_conv1d_run2_" + str(generator_batch_size) + "ihsanconfig"
 Base_Path = "/home/devin/Documents/PITTA LID/"
 image_path = "/home/devin/Documents/PITTA LID/img/"
 train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
 test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
-# test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+#+++++++++++++++TO RUN ON LOCAL (IHSAN)+++++++++++++++++++++++++++++++
+# Base_Path = "/home/ihsan/Documents/thesis_models/"
+# image_path = "/home/ihsan/Documents/thesis_models/images"
 # train_path = "/home/ihsan/Documents/thesis_models/train/"
 # test_path = "/home/ihsan/Documents/thesis_models/test/"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #11 input columns
 #4 output columns.
 
@@ -155,113 +171,142 @@ test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
 #TODO make this convnet construction be a loop.. this is a nightmare to keep track of
 np.random.seed(1337)
 # define the model first
+
+#keras.layers.convolutional.Conv1D(filters, kernel_size, strides=1, padding='valid', dilation_rate=1, \
+                                  #activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, kernel_constraint=None, bias_constraint=None)
+#TODO: make this dependent on the batch?
+#TODO: declare input tensors in the beginning.
 a1 = Input(shape=(None, 1))
-b1 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a1)
-#c1 = MaxPooling1D((2))(b1)
-d1 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b1)
-e1 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d1)
-f1 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e1)
-#e1 = Flatten()(d1)
-g1 = Dense(1, activation='selu')(f1)
-# f1 = Dense(1, activation='selu')(e1)
-
-
 a2 = Input(shape=(None, 1))
-b2 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a2)
-#c2 = MaxPooling1D((2))(b2)
-d2 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b2)
-# e2 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d2)
-#e2 = Flatten()(d2)
-f2 = Dense(8, activation='selu')(d2)
-# f2 = Dense(8, activation='selu')(e2)
-
 a3 = Input(shape=(None, 1))
-b3 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a3)
-#c3 = MaxPooling1D((2))(b3)
-d3 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b3)
-e3 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d3)
-f3 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e3)
-#e3 = Flatten()(d3)
-g3 = Dense(8, activation='selu')(f3)
-# f3 = Dense(8, activation='selu')(e3)
-
 a4 = Input(shape=(None, 1))
-b4 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a4)
-#c4 = MaxPooling1D((2))(b4)
-d4 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b4)
-# e4 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d4)
-#e4 = Flatten()(d4)
-f4 = Dense(8, activation='selu')(d4)
-
 a5 = Input(shape=(None, 1))
-b5 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a5)
-#c5 = MaxPooling1D((2))(b5)
-d5 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b5)
-e5 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d5)
-f5 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e5)
-#e5 = Flatten()(d5)
-g5 = Dense(8, activation='selu')(f5)
-
 a6 = Input(shape=(None, 1))
-b6 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a6)
-#c6 = MaxPooling1D((2))(b6)
-d6 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b6)
-# e6 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d6)
-#e6 = Flatten()(d6)
-f6 = Dense(8, activation='selu')(d6)
-
 a7 = Input(shape=(None, 1))
-b7 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a7)
-#c7 = MaxPooling1D((2))(b7)
-d7 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b7)
-e7 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d7)
-f7 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e7)
-#e7 = Flatten()(d7)
-g7 = Dense(8, activation='selu')(f7)
-
 a8 = Input(shape=(None, 1))
-b8 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a8)
-#c8 = MaxPooling1D((2))(b8)
-d8 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b8)
-# e8 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d8)
-#e8 = Flatten()(d8)
-f8 = Dense(8, activation='selu')(d8)
-
 a9 = Input(shape=(None, 1))
-b9 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a9)
-#c9 = MaxPooling1D((2))(b9)
-d9 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b9)
-# e9 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d9)
-#e9 = Flatten()(d9)
-f9 = Dense(8, activation='selu')(d9)
-
 a10 = Input(shape=(None, 1))
-b10 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a10)
-#c10 = MaxPooling1D((2))(b10)
-d10 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b10)
-# e10 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d10)
-#e10 = Flatten()(d10)
-f10 = Dense(1, activation='selu')(d10)
-
 a11 = Input(shape=(None, 1))
-b11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a11)
-#c11 = MaxPooling1D((2))(b11)
-d11 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b11)
-# e11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d11)
-#e11 = Flatten()(d11)
-f11 = Dense(1, activation='selu')(d11)
+
+g1 = conv_block_double_param_count(input_tensor=a1)
+f2 = conv_block_normal_param_count(input_tensor=a2)
+g3 = conv_block_double_param_count(input_tensor=a3)
+f4 = conv_block_normal_param_count(input_tensor=a4)
+g5 = conv_block_double_param_count(input_tensor=a5)
+f6 = conv_block_normal_param_count(input_tensor=a6)
+g7 = conv_block_double_param_count(input_tensor=a7)
+f8 = conv_block_normal_param_count(input_tensor=a8)
+f9 = conv_block_normal_param_count(input_tensor=a9)
+f10 = conv_block_normal_param_count(input_tensor=a10)
+f11 = conv_block_normal_param_count(input_tensor=a11)
+
+# b1 = Conv1D(128, kernel_size=(64), strides=1, dilation_rate=1, padding='valid', activation='relu')(a1)
+# #print("b1's type: {} shape: {}".format(type(b1), b1.shape))
+# c1 = BatchNormalization()(b1)
+# d1 = Conv1D(64, kernel_size=(8), strides=1, dilation_rate=1, padding='valid', activation='relu')(b1)
+# e1 = BatchNormalization()(d1)
+# # e1 = Conv1D(8, kernel_size=(8),  strides=1, dilation_rate=1, padding='valid', activation='relu')(d1)
+# # f1 = Conv1D(8, kernel_size=(8),  strides=1, dilation_rate=1, padding='valid', activation='relu')(e1)
+# g1 = Dense(1, activation='elu')(d1)
+# # f1 = Dense(1, activation='selu')(e1)
+#
+#
+#
+# b2 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a2)
+# #c2 = MaxPooling1D((2))(b2)
+# d2 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b2)
+# # e2 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d2)
+# e2 = Flatten()(d2)
+# #f2 = Dense(8, activation='elu')(d2)
+# # f2 = Dense(8, activation='selu')(e2)
+#
+#
+# b3 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a3)
+# #c3 = MaxPooling1D((2))(b3)
+# d3 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b3)
+# e3 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d3)
+# f3 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e3)
+# e3 = Flatten()(d3)
+# #g3 = Dense(8, activation='elu')(f3)
+# # f3 = Dense(8, activation='selu')(e3)
+#
+#
+# b4 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a4)
+# #c4 = MaxPooling1D((2))(b4)
+# d4 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b4)
+# # e4 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d4)
+# e4 = Flatten()(d4)
+# f4 = Dense(8, activation='elu')(d4)
+#
+#
+# b5 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a5)
+# #c5 = MaxPooling1D((2))(b5)
+# d5 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b5)
+# e5 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d5)
+# f5 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e5)
+# #e5 = Flatten()(d5)
+# g5 = Dense(8, activation='elu')(f5)
+#
+#
+# b6 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a6)
+# #c6 = MaxPooling1D((2))(b6)
+# d6 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b6)
+# # e6 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d6)
+# #e6 = Flatten()(d6)
+# f6 = Dense(8, activation='elu')(d6)
+#
+#
+# b7 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a7)
+# #c7 = MaxPooling1D((2))(b7)
+# d7 = Conv1D(16, kernel_size=(8), padding='valid', activation='relu')(b7)
+# e7 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(d7)
+# f7 = Conv1D(8, kernel_size=(8), padding='valid', activation='relu')(e7)
+# #e7 = Flatten()(d7)
+# g7 = Dense(8, activation='elu')(f7)
+#
+#
+# b8 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a8)
+# #c8 = MaxPooling1D((2))(b8)
+# d8 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b8)
+# # e8 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d8)
+# #e8 = Flatten()(d8)
+# f8 = Dense(8, activation='elu')(d8)
+#
+#
+# b9 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a9)
+# #c9 = MaxPooling1D((2))(b9)
+# d9 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b9)
+# # e9 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d9)
+# #e9 = Flatten()(d9)
+# f9 = Dense(8, activation='elu')(d9)
+#
+#
+# b10 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a10)
+# #c10 = MaxPooling1D((2))(b10)
+# d10 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b10)
+# # e10 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d10)
+# #e10 = Flatten()(d10)
+# f10 = Dense(1, activation='elu')(d10)
+#
+#
+# b11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(a11)
+# #c11 = MaxPooling1D((2))(b11)
+# d11 = Conv1D(4, kernel_size=(8), padding='valid', activation='relu')(b11)
+# # e11 = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d11)
+# #e11 = Flatten()(d11)
+# f11 = Dense(1, activation='elu')(d11)
 
 g = concatenate([g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11])
-# h = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(g)
-# i = Bidirectional(LSTM(150,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(h)
-# j = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337)))(i)
-k = Dense(16,activation='selu')(g)
+h = Bidirectional(LSTM(160,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(g)
+i = Bidirectional(LSTM(160,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(h)
+j = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337)))(i)
+k = Dense(16,activation='elu')(g)
 #h = Flatten()(g)
 out = Dense(4)(k)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
 plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
-model.compile(loss='mse', optimizer='rmsprop', metrics=['accuracy', 'mae', 'mape', 'mse'])
+model.compile(loss='mse', optimizer='adam', metrics=['accuracy', 'mae', 'mape', 'mse'])
 print("Model summary: {}".format(model.summary()))
 
 print("Inputs: {}".format(model.input_shape))
@@ -302,7 +347,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print("data/label shape: {}, {}, draw #: {}".format(train_array.shape,label_array.shape, i))
         # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
-        train_generator = np_array_pair_generator(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size)
+        train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True)
         training_hist = model.fit_generator(train_generator, epochs=num_epochs, steps_per_epoch=3*(train_array.shape[0]//generator_batch_size), verbose=2)
 
 if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
@@ -349,7 +394,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print(files[0])
         # print("Metrics: {}".format(model.metrics_names))
         # steps per epoch is how many times that generator is called
-        test_generator = np_array_pair_generator(test_array, label_array, start_at = 0,generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True)
         for i in range (1):
             X_test_batch, y_test_batch = test_generator.next()
             # print(X_test_batch)
@@ -364,7 +409,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
                    fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
                    footer=str(), comments='# ')
 
-        test_generator = np_array_pair_generator(test_array, label_array, start_at = 0,generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True)
         prediction_length = (int(0.85*(generator_batch_size * (label_array.shape[0]//generator_batch_size))))
         test_i=0
         # Kindly declare the shape

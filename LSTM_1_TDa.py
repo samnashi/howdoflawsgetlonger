@@ -22,7 +22,8 @@ import sklearn.preprocessing
 
 #you limit the # of calls keras calls the generator OUTSIDE the generator.
 #each time you fit, dataset length // batch size. round down!
-def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data'): #shape is something like 1, 11520, 11
+#TODO: add "use_precomputed_scaler_coeffs = False)
+def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data',use_precomputed_coeffs = False): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -34,6 +35,7 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
     if scaled == True:
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
+            label_scaler = sklearn.preprocessing.StandardScaler()
             print('Standard Scaler initialized \n')
         elif scaler_type == 'minmax':
             scaler = sklearn.preprocessing.MinMaxScaler()
@@ -41,15 +43,30 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
             scaler = sklearn.preprocessing.RobustScaler()
         else:
             scaler = sklearn.preprocessing.StandardScaler() #TRY NORMALIZER FOR THE LABEL
-        #print("scaled: {}, scaler_type: {}".format(scaled, scaler_type))
-        data_scaled = scaler.fit_transform(X=data, y=None)
-        labels_scaled = scaler.fit_transform(X=labels, y=None) #i don't think you should scale the labels..
+        #print("scaled: {}, scaler_type: {}".format(scaled, scaler_type))\
+        if use_precomputed_coeffs == True:
+            scaler.var_ = [1283.8767902599698, 0.6925742052047087, 0.016133766659421164,
+                           0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
+                           3.621824029181443, 0.03209691975648252, 43.47286356045491, 43.472882235044786]
+            scaler.mean_ = [77.84198603763824, 8.648004880708694, 0.5050077150656151,
+                            8.648146575144597, 1.2382993509098987, 9.737983474596277, 1.7792042443537548,
+                            9.737976755677462, 1.9832900698119342, 7.859076582026868, 7.859102808059667]
+            scaler.scale_ = [35.831226468821434, 0.8322104332467292, 0.12701876498935566, 0.8320954139194466, 0.1397616441751066, 1.9030479624833518, 0.1791326531325183, 1.9031090429035966, 0.1791561323440605, 6.593395450028377, 6.5933968661870175]
+            label_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
+            label_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
+            label_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
+            data_scaled = scaler.transform(X=data,y=None)
+            labels_scaled = label_scaler.transform(X=labels,y=None)
+        if use_precomputed_coeffs == False:
+            data_scaled = scaler.fit_transform(X=data, y=None)
+            labels_scaled = scaler.fit_transform(X=labels, y=None) #i don't think you should scale the labels..
         #labels_scaled = labels
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the
         labels_scaled = np.expand_dims(labels_scaled, axis=0)
         index = start_at
+
     while 1:
         #if index < ((data_scaled.shape[1]-start_at)//generator_batch_size)* generator_batch_size:  # for index in range(start_at,generator_batch_size*(data.shape[1]//generator_batch_size)):
         #while index < ((data_scaled.shape[1]-start_at)//generator_batch_size)* generator_batch_size: # for index in range(start_at,data_scaled.shape[1]):
@@ -61,7 +78,8 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         if index + 2 * generator_batch_size < data_scaled.shape[1]:
             index = index + generator_batch_size
         else:
-            index = np.random.randint(low=0,high=(generator_batch_size*((data_scaled.shape[1]-start_at)//generator_batch_size-2)))
+            #index = np.random.randint(low=0,high=(generator_batch_size*((data_scaled.shape[1]-start_at)//generator_batch_size-2)))
+            index = np.random.randint(low=max(0,(generator_batch_size*((data_scaled.shape[1]-start_at)//generator_batch_size-10))),high=(generator_batch_size*((data_scaled.shape[1]-start_at)//generator_batch_size-2)))
             #----------------ENABLE THIS FOR DIAGNOSTICS----------------------
             #print("x_shape at reset: {}".format(x.shape))
         # print("data shape: {}, x type: {}, y type:{}".format(data_scaled.shape,type(x),type(y)))
@@ -79,13 +97,15 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         yield (x, y)
 
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-num_epochs = 5 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 500 #how many times the training corpus is sampled.
+#shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
+num_epochs = 1 #individual. like how many times is the net trained on that sequence consecutively
+num_sequence_draws = 600 #how many times the training corpus is sampled.
 generator_batch_size = 256
+finetune = True
+no_repeats_in_training_set = False
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-identifier = "_3c_elu_longtrain_256bat_fv1b_"
+identifier_finetune = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
+identifier = "_3c2_nonlinonly_fv1b_" #weight name to save as
 Base_Path = "./"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
 test_path = "/home/ihsan/Documents/thesis_models/test/"
@@ -110,14 +130,16 @@ shuffle(combined_filenames)
 print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 
 #define the model first
+#TODO function def to create LSTM model
+#TODO boolean flags for retraining
 #TODO: check if model runs just fine with the batch norm layers
 a = Input(shape=(None,11))
 b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(a)
-#b = BatchNormalization(name='bn_between_lstm')(b)
+b = BatchNormalization(name='bn_between_lstm')(b) #TODO: try all batchnorm on and fastmath is false
 c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(b)
-#c = BatchNormalization(name='bn_after_last_lstm')(c)
+c = BatchNormalization(name='bn_after_last_lstm')(c)
 d = TimeDistributed(Dense(64,activation='elu',kernel_initializer=lecun_normal(seed=1337)))(c)
-#d = BatchNormalization(name='bn_final')(d)
+d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
 keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
@@ -131,9 +153,13 @@ print ("Metrics: {}".format(model.metrics_names))
 plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
 #print ("Actual input: {}".format(data.shape))
 #print ("Actual output: {}".format(target.shape))
-
-print('loading data.')
 weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+print('loading data.')
+# if finetune == False:
+#     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+#     #later line for more logic flow stuff
+# if finetune == True:
+#     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
 #HARDCODED
 #weights_present_indicator = True
 if weights_present_indicator == False:
@@ -146,23 +172,37 @@ if weights_present_indicator == False:
         label_load_path = train_path + '/label/' + files[1]
         #print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
         train_array = np.load(data_load_path)
-        label_array = np.load(label_load_path)[:,1:]
+        label_array = np.load(label_load_path)[:,1:] #,1: is an artifact, StepIndex is dropped, was only there to ensure rigidity
         #-----------COMMENT THESE OUT IF YOU WANT RESCALER ON----------------------------------
         #train_array = np.reshape(train_array,(1,train_array.shape[0],train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
         #--------------------------------------------------------------------------------------
         print("filename: {}, data/label shape: {}, {}, draw #: {}".format(str(files[0]),train_array.shape,label_array.shape, i))
+        start_at_nonlinear_only = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
+
+        if finetune == True: #load the weights
+            finetune_init_weights_filename = 'Weights_' + str(500) + identifier_finetune + '.h5'
+            model.load_weights(finetune_init_weights_filename, by_name=True)
 
         generator_starting_index = train_array.shape[1] - 1 - shortest_length #steps per epoch is how many times that generator is called #train_array.shape[0]//generator_batch_size
-        training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size), epochs=num_epochs, steps_per_epoch=3 * (train_array.shape[0] // generator_batch_size), verbose=2)
+        if i == 0 :
+            training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=start_at_nonlinear_only, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True), epochs=num_epochs, steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size), verbose=2)
+        else:
+            training_hist_increment = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=start_at_nonlinear_only, generator_batch_size=generator_batch_size), epochs=num_epochs, steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size), verbose=2)
 
+        #TODO: extend training hist
     #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
-    if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
+    if weights_present_indicator == False and finetune == True:
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier + '.h5'
-        model.save_weights('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+        model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
-    print('training_hist keys: {}'.format(training_hist.history.keys()))
+    if weights_present_indicator == False and finetune == False:
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_finetune + '.h5'
+        model.save_weights(weights_file_name)
+        print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
+                                                                         weights_file_name))
+    #print('training_hist keys: {}'.format(training_hist.history.keys()))
 
     best_epoch = np.argmax(np.asarray(training_hist.history['acc']))
 
@@ -203,7 +243,7 @@ if weights_present_indicator == False:
 
 weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
 #weights_present_indicator = True
-if weights_present_indicator == True:
+if weights_present_indicator == True: #TODO: finetune related options here.
     #the testing part
     print("TESTING PHASE, with weights {}".format('Weights_' + str(num_sequence_draws) + identifier + '.h5'))
     #print("TESTING PHASE, with weights {}".format('Weights_300_3_firstrun_fv1b_server'))
@@ -247,7 +287,7 @@ if weights_present_indicator == True:
         predictions_length = generator_batch_size * (label_array.shape[0]//generator_batch_size)
         #largest integer multiple of the generator batch size that fits into the length of the sequence.
 
-        test_generator = pair_generator_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size)
+        test_generator = pair_generator_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size, use_precomputed_coeffs = True)
         row_dict = {}
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
                                          max_queue_size=test_array.shape[0], use_multiprocessing=False)

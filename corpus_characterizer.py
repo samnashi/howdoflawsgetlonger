@@ -8,13 +8,202 @@ import json
 import scattergro_utils as sg_utils
 import sklearn.preprocessing
 from scattergro_parser_each import parse_scattergro
+import matplotlib.pyplot as plt
+import pprint
 
 '''Characterizes sequences. Calculates the relevant statistics.'''
 
+def estimate_nonlinearity_onset(return_complete = True, array_path = "", num_flaws=4, min_batch_size=128):
+    '''This is designed to be called during the run of the parser, so there's no pre-existing dict
+    to fall back on. '''
+    rates_at_intervals={}
+    array = np.load(array_path) #small enough to not use a generator.
+    largest_multiple_of_batch_size = min_batch_size * (array.shape[0]//min_batch_size) #the row dimension
+    sequence_characteristics = {}
+    for i in range(0, largest_multiple_of_batch_size, min_batch_size):
+        if i % 2*min_batch_size == 0:
+            sequence_characteristics['bsize=' + str(2*min_batch_size)]=1
+            np.cov(array[i,1],array[i,2])
+            pass
+        if i % 3*min_batch_size == 0:
+            sequence_characteristics['bsize=' + str(3 * min_batch_size)] = 1
+            pass
+        if i % 4*min_batch_size == 0:
+            sequence_characteristics['bsize=' + str(4 * min_batch_size)] = 1
+            pass
+        if i % 5*min_batch_size == 0:
+            sequence_characteristics['bsize=' + str(5 * min_batch_size)] = 1
+            pass
+
+
+    # TODO calculate covariances of everything.
+    #possible_combinations = combinations_with_replacement(  # column numbers ,r=2)
+    # crack position vs crack growth rate
+
+    # load vs. crack growth rate
+
+    # TODO find the kink in crack growth rate.
+    # probably the correlation between the load and the crack growth rate, on each crack..
+    # use pearson_r
+    return rates_at_intervals
+
+def compare_standardscaler_coeffs(fname_entire ="" ,fname_group="",fname_individual="",calculate_all = True):
+    '''returns a dict of lists. This method is to analyze teh variation of standardscaler coefficients, and hopefully
+    be able to come up with a satisfactory set of SS parameters that works for both training and testing'''
+
+    standardscaler_coeffs_dict = {}
+    seq_entire_params_filename = fname_entire
+    if fname_entire == "":
+        seq_entire_params_filename = "./analysis/seq_entire_params.json"
+    seq_entire_params = json.load(open(seq_entire_params_filename))
+
+    #usage print(seq_entire_params[seq_entire_params.iterkeys().next()].keys())
+
+    seq_group_params_filename = fname_group
+    if fname_group == "":
+        seq_group_params_filename = "./analysis/seq_group_params.json"
+    seq_group_params = json.load(open(seq_group_params_filename))
+
+    seq_individual_params_filename = fname_individual
+    if fname_individual == "":
+        seq_individual_params_filename = "./analysis/seq_individual_params.json"
+    seq_individual_params = json.load(open(seq_individual_params_filename))
+
+    if calculate_all == True:
+        '''right now, all this does is apply one aggregation method function on each dict, but this can be tweaked later '''
+        # entire
+        scale_entire_data_list = [] #this is the final values. cast it to a numpy array before returning.
+        scale_entire_label_list = []
+        #first item's shape. should be 11 cols.
+        scale_entire_data_np = np.empty(shape = (np.asarray(seq_entire_params['data']['scale']).shape))
+        scale_entire_label_np = np.empty(shape=(np.asarray(seq_entire_params['label']['scale']).shape))
+
+        mean_entire_data_list = []
+        mean_entire_label_list = []
+        mean_entire_data_np = np.empty(shape = (np.asarray(seq_entire_params['data']['mean']).shape))
+        mean_entire_label_np = np.empty(shape=(np.asarray(seq_entire_params['label']['mean']).shape))
+
+        var_entire_data_list = []
+        var_entire_label_list = []
+        var_entire_data_np = np.empty(shape = (np.asarray(seq_entire_params['data']['var']).shape))
+        mean_entire_label_np = np.empty(shape=(np.asarray(seq_entire_params['label']['mean']).shape))
+
+
+        for key_entire, values in seq_entire_params: #data or label 
+            for key_tier2 in values:
+                if key_entire == 'data':
+                    if key_tier2 == 'scale':
+                        scale_entire_data_list.append(seq_entire_params[key_tier2])
+                    if key_tier2 == 'mean':
+                        mean_entire_data_list.append(seq_entire_params[key_tier2])
+                    if key_tier2 == 'var':
+                        var_entire_data_list.append(seq_entire_params[key_tier2])
+
+        var_entire_data_np = np.array(var_entire_data_list)
+        assert var_entire_data_np.shape == np.asarray(seq_entire_params['data']['var']).shape
+
+        #mean_entire_data
+        scale_group_data_list = []
+        mean_group_data_list = []
+        var_group__data_list = []
+        scale_group_label_list = []
+        mean_group_label_list = []
+        var_group__label_list = []
+        for keys_group in seq_group_params.keys(): #these are csv names.
+            scale_group_data_np = np.empty(shape = (np.asarray(seq_group_params['train'][''])))
+
+            #still need to go through the second tier
+            #TODO: group dict is also useful for finding out which group does the sequence belong to, for postmortem
+            pass
+
+        scale_individual_list = []
+        mean_individual_list = []
+        var_individual_list = []
+        for keys_group in seq_group_params.keys():
+            #still need to go through
+            pass
+    #TODO numpy savetxt covariance matrices
+
+def combined_processed_data_characterizer(train_path = "",test_path = ""):
+    if train_path == "" :
+        train_path = "/home/ihsan/Documents/thesis_models/train/"
+    if test_path == "":
+        test_path = ""
+
+if __name__ == "__main__":
+    '''    processed_path = "/home/ihsan/Documents/thesis_models/unsplit"
+    path = "/home/ihsan/Documents"
+    processed_path = "/home/ihsan/Documents/thesis_models/unsplit"
+    seq_length_dict = {}
+    seq_length_dict_filename = processed_path + "/sequence_lengths.json"
+    seq_group_params = {}
+    seq_group_params_filename = "./analysis/seq_group_params.json"
+    seq_individual_params = {}
+    seq_individual_params_filename = "./analysis/seq_individual_params.json"
+    seq_entire_params = {}
+    seq_entire_params_filename = "./analysis/seq_entire_params.json"'''
+    seq_entire_params_filename = "./analysis/seq_entire_params.json"
+    seq_group_params_filename = "./analysis/seq_group_params.json"
+    seq_individual_params_filename = "./analysis/seq_individual_params.json"
+
+
+    seq_entire_params = json.load(open( seq_entire_params_filename))
+    seq_group_params = json.load(open( seq_group_params_filename))
+    seq_individual_params = json.load(open( seq_individual_params_filename))
+
+    pp = pprint.PrettyPrinter(indent=1)
+
+    # pp.pprint("entire: {}".format(seq_entire_params))
+    # pp.pprint("group: {}".format(seq_group_params))
+    # pp.pprint("individual: {}".format(seq_individual_params))
+
+    print("ENTIRE:")
+    pp.pprint(seq_entire_params)
+    print("GROUP:")
+    pp.pprint(seq_group_params)
+    print("INDIVIDUAL:")
+    pp.pprint(seq_individual_params)
+    # print(json.dumps(seq_individual_params,indent=4))
+
+    #TODO bind list positions to the actual column names
+    # the order of creation is actually group -> individual -> entire.
+    # that's why the colnames are in the "group" dict.
+    train_colnames = []
+    train_colnames = seq_group_params['train_colnames']
+    label_colnames = []
+    label_colnames = seq_group_params['label_colnames']
+
+    ''' u'train_colnames': [u'StepIndex',
+                     u'percent_damage',
+                     u'delta_K_current_1',
+                     u'ctip_posn_curr_1',
+                     u'delta_K_current_2',
+                     u'ctip_posn_curr_2',
+                     u'delta_K_current_3',
+                     u'ctip_posn_curr_3',
+                     u'delta_K_current_4',
+                     u'ctip_posn_curr_4',
+                     u'Load_1',
+                     u'Load_2']}'''
+
+    #TODO: need an if to determine whether this is a label or a data file.
+
+    #EXAMPLE USAGE OF DICT STRUCTURE
+    print(seq_individual_params.keys()[0])
+    print(seq_individual_params[seq_individual_params.keys()[0]]['scale'])
+    print(seq_individual_params[seq_individual_params.keys()[0]]['scale'][train_colnames.index('delta_K_current_1')])
+
+
+
+    #TODO load the jsons, plot the damn things.
+    #histogram of means.
+
+
 #call parser
-parse_scattergro(analysis_mode = True, save_arrays = False, feature_identifier = 'fvx')
+#parse_scattergro(analysis_mode = True, save_arrays = False, feature_identifier = 'fvx')
 
-
+#stack all the relevant columns of all the sequences
+#do a standardscaler partial_fit to calculate the statistics..
 
 
 '''
