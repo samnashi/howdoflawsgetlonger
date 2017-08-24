@@ -63,7 +63,7 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         #labels_scaled = labels
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
-        data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the
+        data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the 0th axis
         labels_scaled = np.expand_dims(labels_scaled, axis=0)
         index = start_at
 

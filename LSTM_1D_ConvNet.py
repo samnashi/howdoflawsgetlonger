@@ -24,20 +24,20 @@ def conv_block_normal_param_count(input_tensor,i=0):
     '''f means it's the normal param count branch'''
     b = Conv1D(64, kernel_size=(64), padding='valid', activation='elu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(64, kernel_size=(16), padding='valid', activation='elu')(c)
+    d = Conv1D(32, kernel_size=(16), padding='valid', activation='elu')(c)
     e = BatchNormalization()(d)
-    f = Dense(2, activation='elu')(e)
+    f = Dense(1, activation='elu')(e)
     return f
 
 def conv_block_double_param_count(input_tensor,i=0):
     '''g means it's the output of the "twice the number of parameters"  branch'''
-    b = Conv1D(128, kernel_size=(64), padding='valid', activation='elu')(input_tensor)
+    b = Conv1D(128, kernel_size=(128), padding='valid', activation='elu')(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(64, kernel_size=(16), padding='valid', activation='elu')(c)
     e = BatchNormalization()(d)
     e = Conv1D(64, kernel_size=(4), padding='valid', activation='elu')(d)
     f = BatchNormalization()(e)
-    g = Dense(8, activation='elu')(f)
+    g = Dense(4, activation='elu')(f)
     return g
 
 def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
@@ -53,7 +53,6 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
-
         elif scaler_type == 'minmax':
             scaler = sklearn.preprocessing.MinMaxScaler()
         elif scaler_type == 'robust':
@@ -83,10 +82,12 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         #----------------------------------------------------------------------------------------------
         #print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-        data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the
-        labels_scaled = np.expand_dims(labels_scaled, axis=0)
-        index = start_at
+
+    data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the 0th axis.
+    labels_scaled = np.expand_dims(labels_scaled, axis=0)
+    index = start_at
     while 1: #for index in range(start_at,generator_batch_size*(data.shape[1]//generator_batch_size)):
+        #print((data_scaled[:, index:index + generator_batch_size_valid_x1, 0]).shape)
         x1 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x1, 0]),newshape = (1,(generator_batch_size_valid_x1),1)) # first dim = 0 doesn't work.
         x2 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x2, 1]),newshape = (1,(generator_batch_size_valid_x2),1))
         x3 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x3, 2]),newshape = (1,(generator_batch_size_valid_x3),1))
@@ -102,9 +103,9 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         #if generator won't yield the full batch in 3 iterations, then..
         if index + 3 * generator_batch_size < data_scaled.shape[1]:
             index = index + generator_batch_size
-        else: #reset. anywhere between 0 and length of dataset - 3*batch size.
+        else: #reset. anywhere between 0 and length of dataset - 2*batch size.
             index = np.random.randint(low=0, high=(
-            generator_batch_size * ((data_scaled.shape[1] - start_at) // generator_batch_size - 3)))
+            generator_batch_size * ((data_scaled.shape[1] - start_at) // generator_batch_size - 2)))
             # ----------------ENABLE THIS FOR DIAGNOSTICS----------------------
             # print("x_shape at reset: {}".format(x.shape))
         #print("after expand dims:: data shape: {}, x1 shape: {}, x type: {}, y type:{}".format(data_scaled.shape,x1.shape,type(x1),type(y)))
@@ -135,7 +136,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 5 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 1000 #how many times the training corpus is sampled.
+num_sequence_draws = 5 #how many times the training corpus is sampled.
 generator_batch_size = 256
 generator_batch_size_valid_x1 = (generator_batch_size)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size)
@@ -152,16 +153,16 @@ generator_batch_size_valid_x11 = (generator_batch_size)
 
 # identifier = "_convlstm_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
 identifier = "_conv1d_run2_" + str(generator_batch_size) + "ihsanconfig"
-Base_Path = "/home/devin/Documents/PITTA LID/"
-image_path = "/home/devin/Documents/PITTA LID/img/"
-train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+# Base_Path = "/home/devin/Documents/PITTA LID/"
+# image_path = "/home/devin/Documents/PITTA LID/img/"
+# train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
 #+++++++++++++++TO RUN ON LOCAL (IHSAN)+++++++++++++++++++++++++++++++
-# Base_Path = "/home/ihsan/Documents/thesis_models/"
-# image_path = "/home/ihsan/Documents/thesis_models/images"
-# train_path = "/home/ihsan/Documents/thesis_models/train/"
-# test_path = "/home/ihsan/Documents/thesis_models/test/"
+Base_Path = "/home/ihsan/Documents/thesis_models/"
+image_path = "/home/ihsan/Documents/thesis_models/images"
+train_path = "/home/ihsan/Documents/thesis_models/train/"
+test_path = "/home/ihsan/Documents/thesis_models/test/"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #11 input columns
@@ -175,7 +176,6 @@ np.random.seed(1337)
 #keras.layers.convolutional.Conv1D(filters, kernel_size, strides=1, padding='valid', dilation_rate=1, \
                                   #activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, kernel_constraint=None, bias_constraint=None)
 #TODO: make this dependent on the batch?
-#TODO: declare input tensors in the beginning.
 a1 = Input(shape=(None, 1))
 a2 = Input(shape=(None, 1))
 a3 = Input(shape=(None, 1))
@@ -297,12 +297,12 @@ f11 = conv_block_normal_param_count(input_tensor=a11)
 # f11 = Dense(1, activation='elu')(d11)
 
 g = concatenate([g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11])
-h = Bidirectional(LSTM(160,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(g)
-i = Bidirectional(LSTM(160,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(h)
-j = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337)))(i)
-k = Dense(16,activation='elu')(g)
-#h = Flatten()(g)
-out = Dense(4)(k)
+h = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(g)
+i = BatchNormalization()(h)
+j = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(i)
+k = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337), activation='elu'))(j)
+l = Dense(16,activation='elu')(k)
+out = Dense(4)(l)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
 plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
