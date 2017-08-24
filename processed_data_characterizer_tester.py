@@ -42,39 +42,58 @@ print(label_folder_contents_filtered)
 
 #predeclare np arrays to store this stuff in
 sample_data_array = np.load(data_folder_contents_filtered[1])
-aggregated_data_coeffs_individual = np.empty(shape=(len(data_folder_contents_filtered),sample_data_array.shape[1]-1)) 
+aggregated_data_coeffs_individual = np.empty(shape=(len(data_folder_contents_filtered)*3,sample_data_array.shape[1]-1))
+#since i'm saving everything in one array for now. #TODO: MAKE THIS INTO THREE ARRAYS )*3 part
 #standardscaler isn't precomputed on stepindex.. any large-scale aggregation on that column makes zero sense! 
 aggregated_data_coeffs_group = np.empty(shape=(3,sample_data_array.shape[1]-1)) #TODO OY CHECK THIS 3, what do you actually want to fit anyway?
 
 sample_label_array = np.load(label_folder_contents_filtered[1])
-aggregated_label_coeffs_individual = np.empty(shape=(len(data_folder_contents_filtered),sample_label_array.shape[1]-1)) 
+aggregated_label_coeffs_individual = np.empty(shape=(len(data_folder_contents_filtered)*3,sample_label_array.shape[1]-1))
 #standardscaler isn't precomputed on stepindex.. any large-scale aggregation on that column makes zero sense! hence the dropped columns. 
 aggregated_label_coeffs_group = np.empty(shape=(3,sample_label_array.shape[1]-1)) #TODO OY CHECK THIS 3, what do you actually want to fit anyway?
 
 #save a text file saying what on earth does column mean (e.g. where everything is!)
 
 #serial, what the heck.
+i=0
 for item in data_folder_contents_filtered:
     individual_data_sequence_scaler = StandardScaler()  # to fit and save on each.
     data_np = np.load(item)
     all_train_data_sequence_scaler.partial_fit(data_np[:,1:])
     individual_data_sequence_scaler.fit(data_np[:,1:])
+    aggregated_data_coeffs_individual[i,:] = individual_data_sequence_scaler.mean_
+    aggregated_data_coeffs_individual[i+1, :] = individual_data_sequence_scaler.scale_
+    aggregated_data_coeffs_individual[i+2, :] = individual_data_sequence_scaler.var_
+    # so, every 3 rows is one sequence. Every 2nd row is the scale, every 3rd is the mean etc.
+    i += 1 #shorthand for i = i + 1
+    #np.save(file="./analysis/")
 
-# all_train_data_sequence_scaler_params['mean'] = np.ndarray.tolist(all_train_data_sequence_scaler.mean_)
-# all_train_data_sequence_scaler_params['scale'] = np.ndarray.tolist(all_train_data_sequence_scaler.scale_)
-# all_train_data_sequence_scaler_params['var'] = np.ndarray.tolist(all_train_data_sequence_scaler.var_)
-# seq_entire_params['data'] = entire_data_scaler_params
+np.save(analysis_path + "agg_data_coeffs_indiv.npy",aggregated_data_coeffs_individual)
+#TODO add headers
+#alphabetical order. mean-scale-var.
+aggregated_data_coeffs_group[0,:] = np.ndarray.tolist(all_train_data_sequence_scaler.mean_)
+aggregated_data_coeffs_group[1,:] = np.ndarray.tolist(all_train_data_sequence_scaler.scale_)
+aggregated_data_coeffs_group[2,:] = np.ndarray.tolist(all_train_data_sequence_scaler.var_)
 
+np.savetxt(analysis_path + "agg_data_coeffs_group.txt",aggregated_data_coeffs_group)
+
+i=1
 for item in label_folder_contents_filtered:
     individual_label_scaler = StandardScaler()
     label_np = np.load(item)
     all_labels_scaler.partial_fit(label_np[:,1:])
     individual_label_scaler.fit(label_np[:,1:])
-
-# all_labels_scaler_params['mean'] = np.ndarray.tolist(all_labels_scaler.mean_)
-# all_labels_scaler_params['scale'] = np.ndarray.tolist(all_labels_scaler.scale_)
-# all_labels_scaler_params['var'] = np.ndarray.tolist(all_labels_scaler.var_)
-# seq_entire_params['label'] = all_labels_scaler_params
+    aggregated_label_coeffs_individual[i,:] = individual_label_scaler.mean_
+    aggregated_label_coeffs_individual[i+1, :] = individual_label_scaler.scale_
+    aggregated_label_coeffs_individual[i+2, :] = individual_label_scaler.var_
+    i += 1
+    # so, every 3 rows is one sequence. Every 2nd row is the scale, every 3rd is the mean etc.
+np.save(analysis_path + "agg_label_coeffs_indiv.npy",aggregated_label_coeffs_individual)
+#TODO add headers
+aggregated_label_coeffs_group[0,:] = np.ndarray.tolist(all_labels_scaler.mean_)
+aggregated_label_coeffs_group[1,:] = np.ndarray.tolist(all_labels_scaler.scale_)
+aggregated_label_coeffs_group[2,:] = np.ndarray.tolist(all_labels_scaler.var_)
+np.savetxt(analysis_path + "agg_label_coeffs_group.txt",aggregated_label_coeffs_group)
 
 # ------------ANALYSIS PART-----------------------------------------------------------------------------
 # if analysis_mode == True:  # calculates statistics

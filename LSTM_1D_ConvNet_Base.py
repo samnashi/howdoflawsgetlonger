@@ -126,24 +126,31 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         #print("scaled: {}, scaler_type: {}".format(scaled,scaler_type))
 
     if use_precomputed_coeffs == True:
-        scaler.var_ = [0.6925742052047087, 0.016133766659421164,
+        #lists as dummy variables first, seems like scikit flips when I pass in a list as an object attribute..
+        scaler_var = [0.6925742052047087, 0.016133766659421164,
                        0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
                        3.621824029181443, 0.03209691975648252, 43.47286356045491, 43.472882235044786]
-        scaler.mean_ = [8.648004880708694, 0.5050077150656151,
+        scaler_mean = [8.648004880708694, 0.5050077150656151,
                         8.648146575144597, 1.2382993509098987, 9.737983474596277, 1.7792042443537548,
                         9.737976755677462, 1.9832900698119342, 7.859076582026868, 7.859102808059667]
-        scaler.scale_ = [0.8322104332467292, 0.12701876498935566,
+        scaler_scale = [0.8322104332467292, 0.12701876498935566,
                          0.8320954139194466, 0.1397616441751066, 1.9030479624833518, 0.1791326531325183,
                          1.9031090429035966, 0.1791561323440605, 6.593395450028377, 6.5933968661870175]
         label_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
         label_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
         label_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
-        scaler_step_index_only.fit(X=data[:,0],y=None) #gotta fit transform since \
+        step_index_to_fit = np.reshape(data[:,0],newshape=(-1,1))
+        #print("the shape scikit is bitching about: {}, and after reshape: {}".format(data[:,0].shape, step_index_to_fit.shape))
+        scaler_step_index_only.fit(X=step_index_to_fit,y=None) #gotta fit transform since \
         #TODO: /usr/local/lib/python2.7/dist-packages/sklearn/preprocessing/data.py:586: DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and will raise ValueError in 0.19. Reshape your data either using X.reshape(-1, 1) if your data has a single feature or X.reshape(1, -1) if it contains a single sample.warnings.warn(DEPRECATION_MSG_1D, DeprecationWarning)
         # it makes no sense to precomp the stepindex. reshape is because sklearn gives a warning about 1D arrays as data..
-        scaler.var_.insert(0,scaler_step_index_only.var_)
-        scaler.mean_.insert(0, scaler_step_index_only.mean_)
-        scaler.scale_.insert(0, scaler_step_index_only.scale_) #append the fitted stepindex params into the main scaler object instance's params.
+        scaler_var.insert(0,scaler_step_index_only.var_) #append the fitted stepindex params into the main scaler object instance's params.
+        scaler.var_ = np.asarray(scaler_var,dtype='float32') #cast as numpy array so scikit won't flip
+        scaler_mean.insert(0, scaler_step_index_only.mean_) #set as scaler object attribute
+        scaler.mean_ = np.asarray(scaler_mean, dtype='float32')
+        scaler_scale.insert(0, scaler_step_index_only.scale_)
+        scaler.scale_ = np.asarray(scaler_scale, dtype='float32')
+        print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
         data_scaled = scaler.transform(X=data,y=None)
         labels_scaled = label_scaler.transform(X=labels,y=None)
     if use_precomputed_coeffs == False:
@@ -208,7 +215,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 #!!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 10 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 5 #how many times the training corpus is sampled.
+num_sequence_draws = 20 #how many times the training corpus is sampled.
 generator_batch_size = 256
 generator_batch_size_valid_x1 = (generator_batch_size)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size)
@@ -241,16 +248,16 @@ sequence_circumnavigation_amt = 3
 # identifier = "_convlstm_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
 identifier = "_conv1d_run2_" + str(generator_batch_size) + "ihsanconfig"
 #^^^^^^^^^^^^^^TO RUN ON CHEZ CHAN^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Base_Path = "/home/devin/Documents/PITTA LID/"
-image_path = "/home/devin/Documents/PITTA LID/img/"
-train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+# Base_Path = "/home/devin/Documents/PITTA LID/"
+# image_path = "/home/devin/Documents/PITTA LID/img/"
+# train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
 #+++++++++++++++TO RUN ON LOCAL (IHSAN)+++++++++++++++++++++++++++++++
-# Base_Path = "/home/ihsan/Documents/thesis_models/"
-# image_path = "/home/ihsan/Documents/thesis_models/images"
-# train_path = "/home/ihsan/Documents/thesis_models/train/"
-# test_path = "/home/ihsan/Documents/thesis_models/test/"
+Base_Path = "/home/ihsan/Documents/thesis_models/"
+image_path = "/home/ihsan/Documents/thesis_models/images"
+train_path = "/home/ihsan/Documents/thesis_models/train/"
+test_path = "/home/ihsan/Documents/thesis_models/test/"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #11 input columns
@@ -288,7 +295,7 @@ f11 = conv_block_normal_param_count(input_tensor=a11)
 
 tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
 g = concatenate(tensors_to_concat)
-g_up = UpSampling1D(size=2)(g)
+g_up = UpSampling1D(size=2)(g) #TODO: wild idea, why don't you try to do a resnet-style merge for the deficit in axis 1?
 
 out = reference_bilstm(input_tensor = g_up)
 

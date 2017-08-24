@@ -26,7 +26,7 @@ from LSTM_1D_ConvNet_Base import pair_generator_1dconv_lstm, conv_block_normal_p
 
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 num_epochs = 5 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 500 #how many times the training corpus is sampled.
+num_sequence_draws = 20 #how many times the training corpus is sampled.
 generator_batch_size = 128
 generator_batch_size_valid_x1 = (generator_batch_size+28)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size+14)
@@ -40,23 +40,23 @@ generator_batch_size_valid_x9 = (generator_batch_size+14)
 generator_batch_size_valid_x10 = (generator_batch_size+14)
 generator_batch_size_valid_x11 = (generator_batch_size+14)
 finetune = False
-use_precomp_sscaler = False
+use_precomp_sscaler = True
 sequence_circumnavigation_amt = 3
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # identifier = "_convlstm_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
 identifier = "_conv1d_run2_" + str(generator_batch_size) + "gen_pad"
 #^^^^^^^^^^^^^^TO RUN ON CHEZ CHAN^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Base_Path = "/home/devin/Documents/PITTA LID/"
-image_path = "/home/devin/Documents/PITTA LID/img/"
-train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
-test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+# Base_Path = "/home/devin/Documents/PITTA LID/"
+# image_path = "/home/devin/Documents/PITTA LID/img/"
+# train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
 #+++++++++++++++TO RUN ON LOCAL (IHSAN)+++++++++++++++++++++++++++++++
-# Base_Path = "/home/ihsan/Documents/thesis_models/"
-# image_path = "/home/ihsan/Documents/thesis_models/images"
-# train_path = "/home/ihsan/Documents/thesis_models/train/"
-# test_path = "/home/ihsan/Documents/thesis_models/test/"
+Base_Path = "/home/ihsan/Documents/thesis_models/"
+image_path = "/home/ihsan/Documents/thesis_models/images"
+train_path = "/home/ihsan/Documents/thesis_models/train/"
+test_path = "/home/ihsan/Documents/thesis_models/test/"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #4 output columns.
 
