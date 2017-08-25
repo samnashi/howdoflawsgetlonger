@@ -35,6 +35,7 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
     if scaled == True:
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
+            scaler_step_index_only = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
             print('Standard Scaler initialized \n')
         elif scaler_type == 'minmax':
@@ -44,22 +45,37 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         else:
             scaler = sklearn.preprocessing.StandardScaler() #TRY NORMALIZER FOR THE LABEL
         #print("scaled: {}, scaler_type: {}".format(scaled, scaler_type))\
-        if use_precomputed_coeffs == True:
-            scaler.var_ = [1283.8767902599698, 0.6925742052047087, 0.016133766659421164,
+        if use_precomputed_coeffs == True and scaled == True and scaler_type == 'standard':
+            #will use precomputed coeffs for everything but the stepIndex (# of cycles column
+            scaler_var = [0.6925742052047087, 0.016133766659421164,
                            0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
                            3.621824029181443, 0.03209691975648252, 43.47286356045491, 43.472882235044786]
-            scaler.mean_ = [77.84198603763824, 8.648004880708694, 0.5050077150656151,
+            scaler_mean = [8.648004880708694, 0.5050077150656151,
                             8.648146575144597, 1.2382993509098987, 9.737983474596277, 1.7792042443537548,
                             9.737976755677462, 1.9832900698119342, 7.859076582026868, 7.859102808059667]
-            scaler.scale_ = [35.831226468821434, 0.8322104332467292, 0.12701876498935566, 0.8320954139194466, 0.1397616441751066, 1.9030479624833518, 0.1791326531325183, 1.9031090429035966, 0.1791561323440605, 6.593395450028377, 6.5933968661870175]
+            scaler_scale = [0.8322104332467292, 0.12701876498935566, 0.8320954139194466, 0.1397616441751066, 1.9030479624833518, 0.1791326531325183, 1.9031090429035966, 0.1791561323440605, 6.593395450028377, 6.5933968661870175]
             label_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
             label_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
             label_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
-            data_scaled = scaler.transform(X=data,y=None)
-            labels_scaled = label_scaler.transform(X=labels,y=None)
+            step_index_to_fit = np.reshape(data[:, 0], newshape=(-1, 1))
+            # print("the shape scikit is bitching about: {}, and after reshape: {}".format(data[:,0].shape, step_index_to_fit.shape))
+            scaler_step_index_only.fit(X=step_index_to_fit, y=None)  # gotta fit transform since \
+            # TODO: /usr/local/lib/python2.7/dist-packages/sklearn/preprocessing/data.py:586: DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and will raise ValueError in 0.19. Reshape your data either using X.reshape(-1, 1) if your data has a single feature or X.reshape(1, -1) if it contains a single sample.warnings.warn(DEPRECATION_MSG_1D, DeprecationWarning)
+            # it makes no sense to precomp the stepindex. reshape is because sklearn gives a warning about 1D arrays as data..
+            scaler_var.insert(0, scaler_step_index_only.var_)
+            # append the fitted stepindex params into the main scaler object instance's params.
+            scaler.var_ = np.asarray(scaler_var, dtype='float32')  # cast as numpy array so scikit won't flip
+            scaler_mean.insert(0, scaler_step_index_only.mean_)  # set as scaler object attribute
+            scaler.mean_ = np.asarray(scaler_mean, dtype='float32')
+            scaler_scale.insert(0, scaler_step_index_only.scale_)
+            scaler.scale_ = np.asarray(scaler_scale, dtype='float32')
+            #print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_), len(scaler.var_),
+                                                                                    #len(scaler.scale_)))
+            data_scaled = scaler.transform(X=data)
+            labels_scaled = label_scaler.transform(X=labels)
         if use_precomputed_coeffs == False:
-            data_scaled = scaler.fit_transform(X=data, y=None)
-            labels_scaled = scaler.fit_transform(X=labels, y=None) #i don't think you should scale the labels..
+            data_scaled = scaler.fit_transform(X=data)
+            labels_scaled = scaler.fit_transform(X=labels) #i don't think you should scale the labels..
         #labels_scaled = labels
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
@@ -99,7 +115,7 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 500 #how many times the training corpus is sampled.
+num_sequence_draws = 50 #how many times the training corpus is sampled.
 generator_batch_size = 256
 finetune = False
 no_repeats_in_training_set = False
@@ -107,10 +123,12 @@ no_repeats_in_training_set = False
 identifier_finetune_init = '_3c3_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
 identifier = "_3c3_nonlinonly_fv1b_" #weight name to save as
 Base_Path = "./"
-#train_path = "/home/efi/Documents/thesis_models/train/"
 train_path = "./train/"
-#test_path = "/home/efi/Documents/thesis_models/test/"
 test_path = "./test/"
+#^^^^^^^^^^^^^^^^^^^^ ABSOLUTE PATHS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#train_path = "/home/efi/Documents/thesis_models/train/"
+#test_path = "/home/efi/Documents/thesis_models/test/"
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #11 input columns
@@ -194,7 +212,8 @@ if weights_present_indicator == False:
             training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True), epochs=num_epochs, steps_per_epoch= 3 * (train_array.shape[0] // generator_batch_size), verbose=2)
         else:
             training_hist_increment = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size), epochs=num_epochs, steps_per_epoch= 3 * (train_array.shape[0] // generator_batch_size), verbose=2)
-
+            for key in training_hist.history:
+                training_hist.history[key].extend(training_hist_increment.history[key]) #thanks tom.
         #TODO: extend training hist
     #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
     if weights_present_indicator == False and finetune == True:
@@ -219,6 +238,8 @@ if weights_present_indicator == False:
                                                          best_result))  # actual epoch is index+1 because arrays start at 0..
 
     # # saves the best epoch's results
+    if not os.path.exists("./results"):
+        os.makedirs("./results")
     np.savetxt(Base_Path + 'results/BestEpochResult_' + str(num_sequence_draws) + identifier + '.txt', best_result,
                fmt='%5.6f', delimiter=' ', newline='\n', header='epoch, loss, acc, mape, mae',
                footer=str(), comments='# ')
@@ -275,6 +296,7 @@ if weights_present_indicator == True: #TODO: finetune related options here.
 
     i=0
     #TODO: still only saves single results.
+    #TODO: csvlogger
     score_rows_list = []
     for files in combined_filenames:
         i=i+1
