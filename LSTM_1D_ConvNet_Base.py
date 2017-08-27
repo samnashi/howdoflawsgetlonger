@@ -9,6 +9,7 @@ from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistribu
     Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate, BatchNormalization, \
     UpSampling1D
 from keras.initializers import lecun_normal,glorot_normal
+from keras.optimizers import adam, rmsprop
 from keras import metrics
 import pandas as pd
 import scipy.io as sio
@@ -35,22 +36,22 @@ def reference_bilstm(input_tensor):
 #---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
     '''f means it's the normal param count branch'''
-    b = Conv1D(64, kernel_size=(128), padding='valid', activation='relu')(input_tensor)
+    b = Conv1D(64, kernel_size=(128), padding='same', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation='relu')(c) #gives me 128x1
-    e = BatchNormalization()(d)
+    d = Conv1D(32, kernel_size=(2), padding='same', activation='relu')(c) #gives me 128x1
+    #e = BatchNormalization()(d)
     #f = UpSampling1D(size=2)(e)
-    g = BatchNormalization()(e)
+    g = BatchNormalization()(d)
     h = Dense(1,activation='relu')(g)
     return h
 def conv_block_double_param_count(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
-    b = Conv1D(128, kernel_size=(128), padding='valid', activation='relu')(input_tensor)
+    b = Conv1D(128, kernel_size=(128), padding='same', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation='relu')(c) #gives me 128x1
-    e = BatchNormalization()(d)
+    d = Conv1D(32, kernel_size=(2), padding='same', activation='relu')(c) #gives me 128x1
+    #e = BatchNormalization()(d)
     #f = UpSampling1D(size=2)(e)
-    g = BatchNormalization()(e)
+    g = BatchNormalization()(d)
     h = Dense(4,activation='relu')(g)
     return h
 #-----------------------------------------------------------------------------------------------------------------------
@@ -58,23 +59,24 @@ def conv_block_double_param_count(input_tensor,conv_activation = 'relu', dense_a
 #---------------------NARROW WINDOW-------------------------------------------------------------------------------------
 def conv_block_double_param_count_narrow_window(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
     '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
-    b = Conv1D(128, kernel_size=(15), padding='valid', activation='relu')(input_tensor)
+    b = Conv1D(128, kernel_size=(32), padding='same', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(c)
-    e = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(d)
-    f = BatchNormalization()(e)
+    d = Conv1D(32, kernel_size=(16), padding='same', activation='relu')(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(32, kernel_size=(8), padding='same', activation='relu')(e)
+    #f = BatchNormalization()(e)
     #f = UpSampling1D(size=2)(e)
     g = BatchNormalization()(f)
     h = Dense(4,activation='relu')(g)
     return h
 def conv_block_normal_param_count_narrow_window(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
     '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
-    b = Conv1D(64, kernel_size=(8), padding='valid', activation='relu')(input_tensor)
+    b = Conv1D(64, kernel_size=(32), padding='same', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(c)
-    e = BatchNormalization()(d)
+    d = Conv1D(32, kernel_size=(8), padding='same', activation='relu')(c)
+    #e = BatchNormalization()(d)
     #f = UpSampling1D(size=2)(e)
-    g = BatchNormalization()(e)
+    g = BatchNormalization()(d)
     h = Dense(1,activation='relu')(g)
     return h
 #-----------------------------------------------------------------------------------------------------------------------
@@ -85,9 +87,9 @@ def conv_block_normal_param_count_narrow_window_causal(input_tensor,conv_activat
     b = Conv1D(64, kernel_size=(8), padding='causal', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(c)
-    e = BatchNormalization()(d)
+    #e = BatchNormalization()(d)
     #f = UpSampling1D(size=2)(e)
-    g = BatchNormalization()(e)
+    g = BatchNormalization()(d)
     h = Dense(1,activation='relu')(g)
     return h
 def conv_block_double_param_count_narrow_window_causal(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
@@ -95,13 +97,20 @@ def conv_block_double_param_count_narrow_window_causal(input_tensor,conv_activat
     b = Conv1D(128, kernel_size=(15), padding='causal', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(c)
-    e = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(d)
-    f = BatchNormalization()(e)
+    e = BatchNormalization()(d)
+    f = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(e)
     #f = UpSampling1D(size=2)(e)
     g = BatchNormalization()(f)
     h = Dense(4,activation='relu')(g)
     return h
 
+
+def set_standalone_scaler_params(output_scaler):
+    '''intended to scale the output of the model to the same scaler as during training.'''
+    output_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
+    output_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
+    output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
+    return output_scaler
 
 def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
@@ -142,7 +151,6 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         step_index_to_fit = np.reshape(data[:,0],newshape=(-1,1))
         #print("the shape scikit is bitching about: {}, and after reshape: {}".format(data[:,0].shape, step_index_to_fit.shape))
         scaler_step_index_only.fit(X=step_index_to_fit,y=None) #gotta fit transform since \
-        #TODO: /usr/local/lib/python2.7/dist-packages/sklearn/preprocessing/data.py:586: DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and will raise ValueError in 0.19. Reshape your data either using X.reshape(-1, 1) if your data has a single feature or X.reshape(1, -1) if it contains a single sample.warnings.warn(DEPRECATION_MSG_1D, DeprecationWarning)
         # it makes no sense to precomp the stepindex. reshape is because sklearn gives a warning about 1D arrays as data..
         scaler_var.insert(0,scaler_step_index_only.var_) #append the fitted stepindex params into the main scaler object instance's params.
         scaler.var_ = np.asarray(scaler_var,dtype='float32') #cast as numpy array so scikit won't flip
@@ -150,7 +158,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         scaler.mean_ = np.asarray(scaler_mean, dtype='float32')
         scaler_scale.insert(0, scaler_step_index_only.scale_)
         scaler.scale_ = np.asarray(scaler_scale, dtype='float32')
-        print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
+        #print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
         data_scaled = scaler.transform(X=data,y=None)
         labels_scaled = label_scaler.transform(X=labels,y=None)
     if use_precomputed_coeffs == False:
@@ -214,9 +222,9 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 
 #!!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-num_epochs = 10 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 20 #how many times the training corpus is sampled.
-generator_batch_size = 256
+num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
+num_sequence_draws = 250 #how many times the training corpus is sampled.
+generator_batch_size = 128
 generator_batch_size_valid_x1 = (generator_batch_size)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size)
 generator_batch_size_valid_x3 = (generator_batch_size)#4layer conv
@@ -228,10 +236,12 @@ generator_batch_size_valid_x8 = (generator_batch_size)
 generator_batch_size_valid_x9 = (generator_batch_size)
 generator_batch_size_valid_x10 = (generator_batch_size)
 generator_batch_size_valid_x11 = (generator_batch_size)
-finetune = False
+finetune = True
 use_precomp_sscaler = True
-sequence_circumnavigation_amt = 3
-
+sequence_circumnavigation_amt = 2
+save_preds = False
+save_figs = False
+env = "blockade_runner" # "cruiser" "chan" #TODO complete the environment_variable_setter
 # generator_batch_size_valid_x1 = (generator_batch_size+28)#4layer conv
 # generator_batch_size_valid_x2 = (generator_batch_size+14)
 # generator_batch_size_valid_x3 = (generator_batch_size+28)#4layer conv
@@ -246,7 +256,13 @@ sequence_circumnavigation_amt = 3
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # identifier = "_convlstm_run1_" + str(generator_batch_size) + "b_completev1data_valid_4layer_1357_"
-identifier = "_conv1d_run2_" + str(generator_batch_size) + "ihsanconfig"
+#Weights_200_conv1d_samepad_1_128shortrun
+
+#"_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
+#Weights_200_conv1d_samepad_1_128shortrun
+identifier_post_training = "conv1d_samepad_finetune"
+#identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
+identifier_pre_training = str(200) + "_conv1d_samepad_" + str(1) + "_" + str(128) + "shortrun" #for now, make hardcode what you want to finetune
 #^^^^^^^^^^^^^^TO RUN ON CHEZ CHAN^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Base_Path = "/home/devin/Documents/PITTA LID/"
 # image_path = "/home/devin/Documents/PITTA LID/img/"
@@ -258,6 +274,7 @@ Base_Path = "/home/ihsan/Documents/thesis_models/"
 image_path = "/home/ihsan/Documents/thesis_models/images"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
 test_path = "/home/ihsan/Documents/thesis_models/test/"
+analysis_path = "home/ihsan/Documents/thesis_models/analysis"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #11 input columns
@@ -295,13 +312,14 @@ f11 = conv_block_normal_param_count(input_tensor=a11)
 
 tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
 g = concatenate(tensors_to_concat)
-g_up = UpSampling1D(size=2)(g) #TODO: wild idea, why don't you try to do a resnet-style merge for the deficit in axis 1?
+#g_up = UpSampling1D(size=2)(g) #TODO: wild idea, why don't you try to do a resnet-style merge for the deficit in axis 1?
 
-out = reference_bilstm(input_tensor = g_up)
+out = reference_bilstm(input_tensor = g)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
-plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
-model.compile(loss='mse', optimizer='adam', metrics=['accuracy', 'mae', 'mape', 'mse'])
+plot_model(model, to_file='model_' + identifier_post_training + '.png', show_shapes=True)
+optimizer_used = adam(lr=0.002)
+model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
 print("Model summary: {}".format(model.summary()))
 
 print("Inputs: {}".format(model.input_shape))
@@ -324,10 +342,12 @@ shuffle(combined_filenames)
 print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 print('loading data...')
 
-print("weights present? {}".format((os.path.isfile(Base_Path + 'Weights_' + str(num_sequence_draws) + identifier + '.h5'))))
-if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
+weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+print("weights present? {}".format((os.path.isfile(Base_Path + 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))))
+csv_logger = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
+if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5') == False:
     print("TRAINING PHASE")
-
+    print("weights_present_indicator: {}, finetune: {}".format(weights_present_indicator,finetune))
     for i in range(0,num_sequence_draws):
         index_to_load = np.random.randint(0, len(combined_filenames))  # switch to iterations
         files = combined_filenames[index_to_load]
@@ -340,18 +360,41 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print("data/label shape: {}, {}, draw #: {}".format(train_array.shape,label_array.shape, i))
         # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
-        train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler)
-        training_hist = model.fit_generator(train_generator, epochs=num_epochs, steps_per_epoch=sequence_circumnavigation_amt*(train_array.shape[0]//generator_batch_size), verbose=2)
+        start_at_nonlinear_only = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
 
-if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == False:
-    weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier + '.h5'
-    print("after {} iterations, model weights is saved as {}".format(num_sequence_draws*num_epochs, weights_file_name))
-    model.save_weights('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+        if finetune == True: #load the weights
+            finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5' #hardcode the previous epoch number UP ABOVE
+            model.load_weights(finetune_init_weights_filename, by_name=True)
 
-if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == True:
-    #the testing part
-    print("TESTING PHASE, with weights {}".format('Weights_' + str(num_sequence_draws) + identifier + '.h5'))
-    model.load_weights('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+        train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=start_at_nonlinear_only,
+                                                     generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler)
+        training_hist = model.fit_generator(train_generator, epochs=num_epochs,
+                                            steps_per_epoch=sequence_circumnavigation_amt*(train_array.shape[0]//generator_batch_size), verbose=2,callbacks=[csv_logger])
+
+
+    if weights_present_indicator == False and finetune == True:
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+        model.save_weights(weights_file_name)
+        print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
+                                                                         weights_file_name))
+    if weights_present_indicator == False and finetune == False: #just makes sure there's no overwrite.
+        #TODO make the logical behaviour of the finetune part a little more refined..
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
+        model.save_weights(weights_file_name)
+        print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
+                                                                         weights_file_name))
+    else: weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+
+if weights_file_name is not None:
+    weights_present_indicator = os.path.isfile(weights_file_name)
+else:
+    weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+if weights_present_indicator == True:  # TODO: finetune related options here.
+    # the testing part
+    print("TESTING PHASE, with weights {}".format(
+        'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))
+    #model.load_weights('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+    model.load_weights(weights_file_name)
 
     # load data multiple times.
     data_filenames = os.listdir(test_path + "data")
@@ -370,10 +413,11 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
     print("after shuffling: {}".format(combined_filenames))  # shuffling works ok.
 
     i=0
-    scaler_output = sklearn.preprocessing.StandardScaler()
+    scaler_output = sklearn.preprocessing.StandardScaler() #TODO: this should use the precomputed coeffs as well...
+    scaler_output = set_standalone_scaler_params(scaler_output)
+
     #TODO: still only saves single results.
     for files in combined_filenames:
-        csv_logger = CSVLogger('logtest.log')
         i=i+1
         data_load_path = test_path + '/data/' + files[0]
         label_load_path = test_path + '/label/' + files[1]
@@ -398,7 +442,7 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         print("scores: {}".format(score))
         # print(score)
         #home/ihsan/Documents/thesis_models/results/
-        np.savetxt('TestResult_' + str(num_sequence_draws) + identifier + '.txt', np.asarray(score),
+        np.savetxt('TestResult_' + str(num_sequence_draws) + identifier_post_training + '.txt', np.asarray(score),
                    fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
                    footer=str(), comments='# ')
 
@@ -416,7 +460,8 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
             y_prediction[0,test_i:test_i + generator_batch_size,:] = y_test_batch
             test_i += generator_batch_size
         # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
-        np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
+        if save_preds == True:
+            np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
 
         # print(y_prediction.shape)
         # print (x_prediction.shape)
@@ -501,63 +546,64 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5') == 
         #     plt.grid(True)
         #     plt.savefig('results_' + str(files[0]) + '_flaw_3_conv_75_100_newmarker_batch' + str(
         #         generator_batch_size) + '_.png')
-
-        plt.clf()
-        plt.cla()
-        plt.close()
-        plt.plot(label_truth[:,0],'^',label="ground truth", markersize=5)
-        plt.plot(y_prediction[:,0],'.',label="prediction", markersize=4)
-        plt.xscale('log')
-        plt.xlabel('# Cycle(s)')
-        plt.yscale('log')
-        plt.ylabel('Value(s)')
-        plt.legend()
-        plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
-        plt.title('truth vs prediction from 50% - 100% of the sequence on Crack 01')
-        plt.grid(True)
-        plt.savefig('results_' + str(files[0]) + '_flaw_0_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
-
-        plt.clf()
-        plt.cla()
-        plt.close()
-        plt.plot(label_truth[:,1],'^',label="ground truth", markersize=5)
-        plt.plot(y_prediction[:,1],'v',label="prediction", markersize=4)
-        plt.xscale('log')
-        plt.xlabel('# Cycle(s)')
-        plt.yscale('log')
-        plt.ylabel('Value(s)')
-        plt.legend()
-        plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
-        plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 02')
-        plt.grid(True)
-        plt.savefig('results_' + str(files[0]) + '_flaw_1_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
-
-        plt.clf()
-        plt.cla()
-        plt.close()
-        plt.plot(label_truth[:,2],'^',label="ground truth", markersize=5)
-        plt.plot(y_prediction[:,2],'v',label="prediction", markersize=4)
-        plt.xscale('log')
-        plt.xlabel('# Cycle(s)')
-        plt.yscale('log')
-        plt.ylabel('Value(s)')
-        plt.legend()
-        plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
-        plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 03')
-        plt.grid(True)
-        plt.savefig('results_' + str(files[0]) + '_flaw_2_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
-
-        plt.clf()
-        plt.cla()
-        plt.close()
-        plt.plot(label_truth[:,3],'^',label="ground truth", markersize=5)
-        plt.plot(y_prediction[:,3],'v',label="prediction", markersize=4)
-        plt.xscale('log')
-        plt.xlabel('# Cycle(s)')
-        plt.yscale('log')
-        plt.ylabel('Value(s)')
-        plt.legend()
-        plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
-        plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 04')
-        plt.grid(True)
-        plt.savefig('results_' + str(files[0]) + '_flaw_3_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
+#DEVIN PLOT CODE
+        # if save_figs == True:
+        #     plt.clf()
+        #     plt.cla()
+        #     plt.close()
+        #     plt.plot(label_truth[:,0],'^',label="ground truth", markersize=5)
+        #     plt.plot(y_prediction[:,0],'.',label="prediction", markersize=4)
+        #     plt.xscale('log')
+        #     plt.xlabel('# Cycle(s)')
+        #     plt.yscale('log')
+        #     plt.ylabel('Value(s)')
+        #     plt.legend()
+        #     plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
+        #     plt.title('truth vs prediction from 50% - 100% of the sequence on Crack 01')
+        #     plt.grid(True)
+        #     plt.savefig('results_' + str(files[0]) + '_flaw_0_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
+        #
+        #     plt.clf()
+        #     plt.cla()
+        #     plt.close()
+        #     plt.plot(label_truth[:,1],'^',label="ground truth", markersize=5)
+        #     plt.plot(y_prediction[:,1],'v',label="prediction", markersize=4)
+        #     plt.xscale('log')
+        #     plt.xlabel('# Cycle(s)')
+        #     plt.yscale('log')
+        #     plt.ylabel('Value(s)')
+        #     plt.legend()
+        #     plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
+        #     plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 02')
+        #     plt.grid(True)
+        #     plt.savefig('results_' + str(files[0]) + '_flaw_1_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
+        #
+        #     plt.clf()
+        #     plt.cla()
+        #     plt.close()
+        #     plt.plot(label_truth[:,2],'^',label="ground truth", markersize=5)
+        #     plt.plot(y_prediction[:,2],'v',label="prediction", markersize=4)
+        #     plt.xscale('log')
+        #     plt.xlabel('# Cycle(s)')
+        #     plt.yscale('log')
+        #     plt.ylabel('Value(s)')
+        #     plt.legend()
+        #     plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
+        #     plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 03')
+        #     plt.grid(True)
+        #     plt.savefig('results_' + str(files[0]) + '_flaw_2_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')
+        #
+        #     plt.clf()
+        #     plt.cla()
+        #     plt.close()
+        #     plt.plot(label_truth[:,3],'^',label="ground truth", markersize=5)
+        #     plt.plot(y_prediction[:,3],'v',label="prediction", markersize=4)
+        #     plt.xscale('log')
+        #     plt.xlabel('# Cycle(s)')
+        #     plt.yscale('log')
+        #     plt.ylabel('Value(s)')
+        #     plt.legend()
+        #     plt.xlim((0.5*(len(y_prediction)), 1*(len(y_prediction))))
+        #     plt.title('truth vs prediction  from 50% - 100% of the sequence on Crack 04')
+        #     plt.grid(True)
+        #     plt.savefig('results_' + str(files[0]) + '_flaw_3_conv_50_100_newmarker_batch' + str(generator_batch_size) + '_.png')

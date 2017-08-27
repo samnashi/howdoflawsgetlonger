@@ -99,13 +99,15 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 1 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 600 #how many times the training corpus is sampled.
+num_sequence_draws = 1 #how many times the training corpus is sampled.
 generator_batch_size = 256
 finetune = True
 no_repeats_in_training_set = False
+dry_run = True #weights aren't saved.
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-identifier_finetune = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
-identifier = "_3c2_nonlinonly_fv1b_" #weight name to save as
+#identifier_finetune = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
+identifier_pre_training = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
+identifier_post_training = "dryrun" #weight name to save as
 Base_Path = "./"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
 test_path = "/home/ihsan/Documents/thesis_models/test/"
@@ -150,10 +152,10 @@ print("Inputs: {}".format(model.input_shape))
 print ("Outputs: {}".format(model.output_shape))
 print ("Metrics: {}".format(model.metrics_names))
 
-plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
+plot_model(model, to_file='model_' + identifier_post_training + '.png', show_shapes=True)
 #print ("Actual input: {}".format(data.shape))
 #print ("Actual output: {}".format(target.shape))
-weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
 print('loading data.')
 # if finetune == False:
 #     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
@@ -164,7 +166,7 @@ print('loading data.')
 #weights_present_indicator = True
 if weights_present_indicator == False:
     print("TRAINING PHASE")
-
+    print("weights_present_indicator: {}, finetune: {}".format(weights_present_indicator,finetune))
     for i in range(0,num_sequence_draws):
         index_to_load = np.random.randint(0, len(combined_filenames))  # switch to iterations
         files = combined_filenames[index_to_load]
@@ -181,10 +183,9 @@ if weights_present_indicator == False:
         start_at_nonlinear_only = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
 
         if finetune == True: #load the weights
-            finetune_init_weights_filename = 'Weights_' + str(500) + identifier_finetune + '.h5'
+            finetune_init_weights_filename = 'Weights_' + str(500) + identifier_pre_training + '.h5'
             model.load_weights(finetune_init_weights_filename, by_name=True)
 
-        generator_starting_index = train_array.shape[1] - 1 - shortest_length #steps per epoch is how many times that generator is called #train_array.shape[0]//generator_batch_size
         if i == 0 :
             training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=start_at_nonlinear_only, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True), epochs=num_epochs, steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size), verbose=2)
         else:
@@ -193,12 +194,12 @@ if weights_present_indicator == False:
         #TODO: extend training hist
     #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
     if weights_present_indicator == False and finetune == True:
-        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier + '.h5'
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
     if weights_present_indicator == False and finetune == False:
-        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_finetune + '.h5'
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
@@ -214,18 +215,18 @@ if weights_present_indicator == False:
                                                          best_result))  # actual epoch is index+1 because arrays start at 0..
 
     # # saves the best epoch's results
-    np.savetxt(Base_Path + 'results/BestEpochResult_' + str(num_sequence_draws) + identifier + '.txt', best_result,
+    np.savetxt(Base_Path + 'results/BestEpochResult_' + str(num_sequence_draws) + identifier_post_training + '.txt', best_result,
                fmt='%5.6f', delimiter=' ', newline='\n', header='epoch, loss, acc, mape, mae',
                footer=str(), comments='# ')
 
-    np.save(Base_Path + 'results/acc_' + str(num_sequence_draws) + identifier + '.npy',
+    np.save(Base_Path + 'results/acc_' + str(num_sequence_draws) + identifier_post_training + '.npy',
             np.asarray(training_hist.history['acc']))
-    np.save(Base_Path + 'results/loss_' + str(num_sequence_draws) + identifier + '.npy',
+    np.save(Base_Path + 'results/loss_' + str(num_sequence_draws) + identifier_post_training + '.npy',
             np.asarray(training_hist.history['loss']))
 
     # # summarize history for accuracy
     plt.plot(training_hist.history['acc'])
-    plt.title('model MAIN accuracy' + identifier)
+    plt.title('model MAIN accuracy' + identifier_post_training)
     plt.ylabel('MAIN accuracy')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
@@ -234,20 +235,23 @@ if weights_present_indicator == False:
 
     # # summarize history for loss
     plt.plot(training_hist.history['loss'])
-    plt.title('model loss' + identifier)
+    plt.title('model loss' + identifier_post_training)
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     #plt.savefig(Base_Path + 'results/loss_' + str(num_sequence_draws) + identifier + '.png', bbox_inches='tight')
     plt.clf()
 
-weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+if weights_file_name is not None:
+    weights_present_indicator = os.path.isfile(weights_file_name)
+else:
+    weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
 #weights_present_indicator = True
 if weights_present_indicator == True: #TODO: finetune related options here.
     #the testing part
-    print("TESTING PHASE, with weights {}".format('Weights_' + str(num_sequence_draws) + identifier + '.h5'))
+    print("TESTING PHASE, with weights: {}".format('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))
     #print("TESTING PHASE, with weights {}".format('Weights_300_3_firstrun_fv1b_server'))
-    model.load_weights('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+    model.load_weights('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
     #model.load_weights('Weights_300_3_firstrun_fv1b_server.h5')
 
     # load data multiple times.
@@ -300,7 +304,7 @@ if weights_present_indicator == True: #TODO: finetune related options here.
         score_rows_list.append(row_dict)
 
     score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
-    score_df.to_csv('scores_lstm_' + identifier + '.csv')
+    score_df.to_csv('scores_lstm_' + identifier_post_training + '.csv')
 
         # y_pred = np.zeros(shape=(1,predictions_length,4))
         # y_true = np.zeros(shape=(1,predictions_length,4))
