@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import pandas as pd
+from corpus_characterizer import generator_chunker
 
 np.set_printoptions(precision=3,suppress = True, linewidth = 150)
 import matplotlib.pyplot as plt
@@ -79,6 +80,8 @@ corrcoef_flaw0_flaw1 = np.cov(label_array_test[:,1],label_array_test[:,2], rowva
 print(cov_flaw0_flaw1)
 print(corrcoef_flaw0_flaw1)
 
+
+#--------- starts here.
 relevant_vars_array = np.empty(shape=(data_array_test.shape[0],13))
 print("slice of data array shape: {}".format(data_array_test[:,2:].shape))
 relevant_vars_array[:,0:9] = data_array_test[:,2:]
@@ -96,3 +99,25 @@ print(corr_one_sequence_combined)
 corrcoef_one_sequence_combined = np.corrcoef(relevant_vars_array,rowvar = False)
 print(corrcoef_one_sequence_combined.shape)
 print(corrcoef_one_sequence_combined)
+
+#incomplete test script -> PASTE THIS BACK INTO THE covariance method in corpus_characterizer
+'''utility to do chunkwise prediction. chunk mode can be "percent_damage" or "step", array list's length should be 1 or 2.
+ calculate each chunk means calculate every chunk's statistics; calculate cumulative means it's like a partial fit
+ with the temporary states saved in between. This method is used in many other modules, even to compare results'''
+array_list = []
+calculate_each_chunk = True
+calculate_cumulative_each_chunk = True,
+chunks = 5,
+chunk_mode = 'step'
+
+isExhausted = False
+if (type(array_list) != list) or type(array_list[0]) != np.ndarray or type(array_list[1] != np.ndarray):
+    print("Input is of an incorrect type. You need a list of numpy ndarrays.")
+    raise TypeError
+if len(array_list) > 2:
+    print("List of input arrays is longer than 2, only the first 2 arrays will be used.")
+if calculate_cumulative_each_chunk == True and calculate_each_chunk == True:
+    pass
+    #make a two-array generator
+array_list[0]=None
+array_list[1]= None

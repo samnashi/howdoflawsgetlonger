@@ -104,7 +104,6 @@ def conv_block_double_param_count_narrow_window_causal(input_tensor,conv_activat
     h = Dense(4,activation='relu')(g)
     return h
 
-
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.'''
     output_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
@@ -219,11 +218,13 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (y.shape[1] == generator_batch_size)
         yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
+def folder_presence_checker(folder_dict): #TODO os.exists then os.mkdir
+    pass
 
 #!!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 250 #how many times the training corpus is sampled.
+num_sequence_draws = 50 #how many times the training corpus is sampled.
 generator_batch_size = 128
 generator_batch_size_valid_x1 = (generator_batch_size)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size)
@@ -237,6 +238,7 @@ generator_batch_size_valid_x9 = (generator_batch_size)
 generator_batch_size_valid_x10 = (generator_batch_size)
 generator_batch_size_valid_x11 = (generator_batch_size)
 finetune = True
+test_only = True #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
 sequence_circumnavigation_amt = 2
 save_preds = False
@@ -260,21 +262,34 @@ env = "blockade_runner" # "cruiser" "chan" #TODO complete the environment_variab
 
 #"_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
 #Weights_200_conv1d_samepad_1_128shortrun
-identifier_post_training = "conv1d_samepad_finetune"
+identifier_post_training = "_conv1d_samepad_finetune_1"
 #identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
-identifier_pre_training = str(200) + "_conv1d_samepad_" + str(1) + "_" + str(128) + "shortrun" #for now, make hardcode what you want to finetune
-#^^^^^^^^^^^^^^TO RUN ON CHEZ CHAN^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+identifier_pre_training = str(250) + "conv1d_samepad_finetune"  #for now, make hardcode what you want to finetune
+history_filename = "./analysis/training_history" + identifier_post_training + ".json"
+#@@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# Base_Path = "./"
+# image_path = "./images/"
+# train_path = "./train/"
+# test_path = "./test/"
+# analysis_path = "./analysis."
+#^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Base_Path = "/home/devin/Documents/PITTA LID/"
 # image_path = "/home/devin/Documents/PITTA LID/img/"
 # train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
 # test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
 # test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
-#+++++++++++++++TO RUN ON LOCAL (IHSAN)+++++++++++++++++++++++++++++++
+#+++++++++++++ TO RUN ON LOCAL (IHSAN) +++++++++++++++++++++++++++++++
 Base_Path = "/home/ihsan/Documents/thesis_models/"
 image_path = "/home/ihsan/Documents/thesis_models/images"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
 test_path = "/home/ihsan/Documents/thesis_models/test/"
 analysis_path = "home/ihsan/Documents/thesis_models/analysis"
+#%%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Base_Path = "/home/efi/Documents/thesis_models/"
+# image_path = "/home/efi/Documents/thesis_models/images"
+# train_path = "/home/efi/Documents/thesis_models/train/"
+# test_path = "/home/efi/Documents/thesis_models/test/"
+# analysis_path = "home/efi/Documents/thesis_models/analysis"
 #seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #11 input columns
@@ -318,21 +333,20 @@ out = reference_bilstm(input_tensor = g)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
 plot_model(model, to_file='model_' + identifier_post_training + '.png', show_shapes=True)
-optimizer_used = adam(lr=0.002)
+optimizer_used = adam(lr=0.003)
 model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
 print("Model summary: {}".format(model.summary()))
-
 print("Inputs: {}".format(model.input_shape))
 print ("Outputs: {}".format(model.output_shape))
 print ("Metrics: {}".format(model.metrics_names))
 
 #load data multiple times.
-data_filenames = os.listdir(train_path + "data")
+data_filenames = list(set(os.listdir(train_path + "data")))
 #print("before sorting, data_filenames: {}".format(data_filenames))
 data_filenames.sort()
 #print("after sorting, data_filenames: {}".format(data_filenames))
 
-label_filenames = os.listdir(train_path + "label")
+label_filenames = list(set(os.listdir(train_path + "label")))
 label_filenames.sort() #sorting makes sure the label and the data are lined up.
 #print("label_filenames: {}".format(data_filenames))
 assert len(data_filenames) == len(label_filenames)
@@ -340,12 +354,19 @@ combined_filenames = zip(data_filenames,label_filenames)
 #print("before shuffling: {}".format(combined_filenames))
 shuffle(combined_filenames)
 print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
-print('loading data...')
+print('data loaded.')
 
-weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
-print("weights present? {}".format((os.path.isfile(Base_Path + 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))))
-csv_logger = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
-if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5') == False:
+weights_file_name = None #the post training flag. otherwise Python flips that I didn't pre-declare it.
+if finetune==False:
+    weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+else:
+    weights_present_indicator = os.path.isfile('Weights_' + identifier_pre_training + '.h5')
+
+print("weights present? {}".format(weights_present_indicator))
+csv_logger_train = CSVLogger(filename = './analysis/logtrain' + identifier_post_training + ".csv", append=True)
+
+
+if (finetune == False and weights_present_indicator == False) or (finetune == True and weights_present_indicator == True):
     print("TRAINING PHASE")
     print("weights_present_indicator: {}, finetune: {}".format(weights_present_indicator,finetune))
     for i in range(0,num_sequence_draws):
@@ -360,50 +381,81 @@ if os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_trainin
         print("data/label shape: {}, {}, draw #: {}".format(train_array.shape,label_array.shape, i))
         # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
-        start_at_nonlinear_only = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
 
-        if finetune == True: #load the weights
-            finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5' #hardcode the previous epoch number UP ABOVE
+        if finetune == True:  # load the weights
+            finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
             model.load_weights(finetune_init_weights_filename, by_name=True)
 
-        train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=start_at_nonlinear_only,
-                                                     generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler)
-        training_hist = model.fit_generator(train_generator, epochs=num_epochs,
-                                            steps_per_epoch=sequence_circumnavigation_amt*(train_array.shape[0]//generator_batch_size), verbose=2,callbacks=[csv_logger])
+        nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
+        shuffled_starting_position = np.random.randint(0,nonlinear_part_starting_position)
 
+        train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
+                                                     generator_batch_size=generator_batch_size,
+                                                     use_precomputed_coeffs=use_precomp_sscaler)
+        if i==0:
+            training_hist = model.fit_generator(train_generator, epochs=num_epochs,
+                                                steps_per_epoch=sequence_circumnavigation_amt * (
+                                                train_array.shape[0] // generator_batch_size), verbose=2,
+                                                callbacks=[csv_logger_train])
+        else:
+            training_hist_increment = model.fit_generator(train_generator, epochs=num_epochs,
+                                                steps_per_epoch=sequence_circumnavigation_amt * (
+                                                train_array.shape[0] // generator_batch_size), verbose=2,
+                                                callbacks=[csv_logger_train])
+            for key in training_hist.history:
+                training_hist.history[key].extend(training_hist_increment.history[key]) #thanks tom.
 
     if weights_present_indicator == False and finetune == True:
+        print("fine-tuning/partial training session completed.")
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
-    if weights_present_indicator == False and finetune == False: #just makes sure there's no overwrite.
-        #TODO make the logical behaviour of the finetune part a little more refined..
+    if weights_present_indicator == False and finetune == False: #fresh training
+        print("FRESH training session completed.")
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
-    else: weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+    else: # TESTING ONLY! bypass weights present indicator.
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+        #test_weights_present_indicator
+#json.dump(training_hist.history, history_filename)
 
 if weights_file_name is not None:
-    weights_present_indicator = os.path.isfile(weights_file_name)
+    #means it went through the training loop
+    if os.path.isfile(weights_file_name) == False:
+        print("Weights from training weren't saved as .h5 but is retained in memory.")
+        test_weights_present_indicator = True
+        print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
+        weights_to_test_with_fname = "weights retained in runtime memory"
+    test_weights_present_indicator = True #retained in memory.
+    if os.path.isfile(weights_file_name) == True:
+        print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
+                                                                        test_weights_present_indicator))
+        weights_to_test_with_fname = weights_file_name
+        model.load_weights(weights_to_test_with_fname, by_name=True)
+if test_only == True:
+    weights_to_test_with_fname = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
+    model.load_weights(weights_to_test_with_fname, by_name=True)
 else:
-    weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
-if weights_present_indicator == True:  # TODO: finetune related options here.
+    print("Warning: check input flags. No training has been done, and testing is "
+          "about to be performed with weights labeled as POST TRAINING weights")
+    test_weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+
+csv_logger_test = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
+
+if test_weights_present_indicator == True:
     # the testing part
-    print("TESTING PHASE, with weights {}".format(
-        'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))
-    #model.load_weights('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
-    model.load_weights(weights_file_name)
+    print("TESTING PHASE, with weights {}".format(weights_to_test_with_fname))
 
     # load data multiple times.
-    data_filenames = os.listdir(test_path + "data")
+    data_filenames = list(set(os.listdir(test_path + "data")))
     # print("before sorting, data_filenames: {}".format(data_filenames))
     data_filenames.sort()
     # print("after sorting, data_filenames: {}".format(data_filenames))
 
-
-    label_filenames = os.listdir(test_path + "label")
+    label_filenames = list(set(os.listdir(test_path + "label")))
     label_filenames.sort()
     # print("label_filenames: {}".format(data_filenames))
     assert len(data_filenames) == len(label_filenames)
@@ -413,9 +465,7 @@ if weights_present_indicator == True:  # TODO: finetune related options here.
     print("after shuffling: {}".format(combined_filenames))  # shuffling works ok.
 
     i=0
-    scaler_output = sklearn.preprocessing.StandardScaler() #TODO: this should use the precomputed coeffs as well...
-    scaler_output = set_standalone_scaler_params(scaler_output)
-
+    score_rows_list = []
     #TODO: still only saves single results.
     for files in combined_filenames:
         i=i+1
@@ -438,16 +488,22 @@ if weights_present_indicator == True:  # TODO: finetune related options here.
             # print(y_test_batch)
             score = model.predict_on_batch(X_test_batch)
             # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
-        score = model.evaluate_generator(test_generator, steps=(test_array.shape[0]//generator_batch_size),max_queue_size=test_array.shape[0],use_multiprocessing=False)
+        score = model.evaluate_generator(test_generator, steps=(test_array.shape[0]//generator_batch_size),
+                                         max_queue_size=test_array.shape[0],use_multiprocessing=False,callbacks=[csv_logger_test])
+        row_dict = {}
         print("scores: {}".format(score))
-        # print(score)
-        #home/ihsan/Documents/thesis_models/results/
-        np.savetxt('TestResult_' + str(num_sequence_draws) + identifier_post_training + '.txt', np.asarray(score),
-                   fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
-                   footer=str(), comments='# ')
+        row_dict['filename'] = str(files[0])[:-4]
+        row_dict['loss'] = score[0]  # 'loss'
+        row_dict['acc'] = score[1]  # 'acc'
+        row_dict['mae'] = score[2]  # 'mean_absolute_error'
+        row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+        score_rows_list.append(row_dict)
 
+
+        
+        #testing should start at 0. For now. 
         test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler)
-        prediction_length = (int(0.85*(generator_batch_size * (label_array.shape[0]//generator_batch_size))))
+        prediction_length = (int(1.0*(generator_batch_size * (label_array.shape[0]//generator_batch_size))))
         test_i=0
         # Kindly declare the shape
         x_prediction = np.zeros(shape=[1, prediction_length, 4])
@@ -473,12 +529,17 @@ if weights_present_indicator == True:  # TODO: finetune related options here.
         label_truth = label_array[0:y_prediction.shape[0],:]
         # print (label_truth.shape)
         label_truth_temp = label_truth
-        label_truth = scaler_output.fit_transform(X=label_truth_temp,y=None)
+        scaler_output = sklearn.preprocessing.StandardScaler()  # TODO: this should use the precomputed coeffs as well...
+        scaler_output = set_standalone_scaler_params(scaler_output)
+        #print("")
+        label_truth = scaler_output.transform(X=label_truth_temp,y=None)
 
         resample_interval = 16
         label_truth = label_truth[::resample_interval,:]
         y_prediction = y_prediction[::resample_interval,:]
 
+    score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
+    score_df.to_csv('scores_lstm_' + identifier_post_training + '.csv')
         # print(len(y_prediction))
 
 
