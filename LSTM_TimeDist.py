@@ -121,12 +121,12 @@ test_path = "/home/ihsan/Documents/thesis_models/test/"
 
 np.random.seed(1337)
 #load data multiple times.
-data_filenames = os.listdir(train_path + "data")
+data_filenames = list(set(os.listdir(train_path + "data")))
 #print("before sorting, data_filenames: {}".format(data_filenames))
 data_filenames.sort()
 #print("after sorting, data_filenames: {}".format(data_filenames))
 
-label_filenames = os.listdir(train_path + "label")
+label_filenames = list(set(os.listdir(train_path + "label")))
 label_filenames.sort() #sorting makes sure the label and the data are lined up.
 #print("label_filenames: {}".format(data_filenames))
 assert len(data_filenames) == len(label_filenames)
@@ -160,14 +160,16 @@ plot_model(model, to_file='model_' + identifier_post_training + '.png', show_sha
 #print ("Actual input: {}".format(data.shape))
 #print ("Actual output: {}".format(target.shape))
 weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
-print('data loaded.')
-weights_file_name = None #the post training flag. otherwise Python flips that I didn't pre-declare it.
+print('Data loaded.')
 if finetune==False:
     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+    print("Are weights (with the given name to be saved as) already present? {}".format(weights_present_indicator))
 else:
     weights_present_indicator = os.path.isfile('Weights_' + identifier_pre_training + '.h5')
+    print("Are weights (with the given name) to initialize with present? {}".format(weights_present_indicator))
 
-print("weights present? {}".format(weights_present_indicator))
+csv_logger = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
+weights_file_name = None
 
 if (finetune == False and weights_present_indicator == False) or (finetune == True and weights_present_indicator == True):
     print("TRAINING PHASE")
@@ -197,51 +199,53 @@ if (finetune == False and weights_present_indicator == False) or (finetune == Tr
 
         if i == 0 :
             training_hist = model.fit_generator(train_generator,epochs=num_epochs,
-                                                steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size), verbose=2)
+                                                steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size),
+                                                callbacks = [csv_logger], verbose=2)
         else:
-            training_hist_increment = model.fit_generator(train_generator, epochs=num_epochs, steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size), verbose=2)
+            training_hist_increment = model.fit_generator(train_generator, epochs=num_epochs,
+                                                          steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size),
+                                                          callbacks = [csv_logger],verbose=2)
 
     #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
-        if weights_present_indicator == False and finetune == True:
-            print("fine-tuning/partial training session completed.")
-            weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
-            model.save_weights(weights_file_name)
-            print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
-                                                                             weights_file_name))
-        if weights_present_indicator == False and finetune == False:  # fresh training
-            print("FRESH training session completed.")
-            weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
-            model.save_weights(weights_file_name)
-            print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
-                                                                             weights_file_name))
-        else:  # TESTING ONLY! bypass weights present indicator.
-            weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
-            # test_weights_present_indicator
-    # json.dump(training_hist.history, history_filename)
+            if weights_present_indicator == True and finetune == True:
+                print("fine-tuning/partial training session completed.")
+                weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+                model.save_weights(weights_file_name)
+                print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
+                                                                                 weights_file_name))
+            if weights_present_indicator == False and finetune == False:  # fresh training
+                print("FRESH training session completed.")
+                weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
+                model.save_weights(weights_file_name)
+                print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
+                                                                                 weights_file_name))
+            else:  # TESTING ONLY! bypass weights present indicator.
+                weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
+                # test_weights_present_indicator
 
-    if weights_file_name is not None:
-        # means it went through the training loop
-        if os.path.isfile(weights_file_name) == False:
-            print("Weights from training weren't saved as .h5 but is retained in memory.")
-            test_weights_present_indicator = True
-            print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
-            weights_to_test_with_fname = "weights retained in runtime memory"
-        test_weights_present_indicator = True  # retained in memory.
-        if os.path.isfile(weights_file_name) == True:
-            print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
-                                                                                            test_weights_present_indicator))
-            weights_to_test_with_fname = weights_file_name
-            model.load_weights(weights_to_test_with_fname, by_name=True)
-    if test_only == True:
-        weights_to_test_with_fname = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
+print("weights_file_name is: {}".format(weights_file_name))
+if weights_file_name is not None:
+    # means it went through the training loop
+    if os.path.isfile(weights_file_name) == False:
+        print("Weights from training weren't saved as .h5 but is retained in memory.")
+        test_weights_present_indicator = True
+        print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
+        weights_to_test_with_fname = "weights retained in runtime memory"
+    if os.path.isfile(weights_file_name) == True:
+        test_weights_present_indicator = True
+        print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
+                                                                                        test_weights_present_indicator))
+        weights_to_test_with_fname = weights_file_name
         model.load_weights(weights_to_test_with_fname, by_name=True)
-    else:
-        print("Warning: check input flags. No training has been done, and testing is "
-              "about to be performed with weights labeled as POST TRAINING weights")
-        test_weights_present_indicator = os.path.isfile(
-            'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
 
-    csv_logger_test = CSVLogger(filename='./analysis/logtest' + identifier_post_training + ".csv", append=True)
+if test_only == True:
+    weights_to_test_with_fname = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
+    model.load_weights(weights_to_test_with_fname, by_name=True)
+else:
+    print(
+        "Warning: check input flags. No training has been done, and testing is about to be performed with weights labeled as POST TRAINING weights")
+    test_weights_present_indicator = os.path.isfile(
+        'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
 if weights_present_indicator == True: #TODO: finetune related options here.
     #the testing part
     print("TESTING PHASE, with weights: {}".format('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))
@@ -252,13 +256,13 @@ if weights_present_indicator == True: #TODO: finetune related options here.
     # load data multiple times.
 
     #data_filenames = os.listdir('/media/ihsan/BigRigData/Thesis/Dataset_FV1_stepindex/test/data/')
-    data_filenames = os.listdir(test_path + "data")
+    data_filenames = list(set(os.listdir(test_path + "data")))
     # print("before sorting, data_filenames: {}".format(data_filenames))
     data_filenames.sort()
     # print("after sorting, data_filenames: {}".format(data_filenames))
 
     #label_filenames = os.listdir('/media/ihsan/BigRigData/Thesis/Dataset_FV1_stepindex/test/label')
-    label_filenames = os.listdir(test_path + "label")
+    label_filenames = list(set(os.listdir(test_path + "label")))
     label_filenames.sort()
     # print("label_filenames: {}".format(data_filenames))
     assert len(data_filenames) == len(label_filenames)
@@ -290,7 +294,7 @@ if weights_present_indicator == True: #TODO: finetune related options here.
                                              generator_batch_size=generator_batch_size, use_precomputed_coeffs = True)
         row_dict = {}
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
-                                         max_queue_size=test_array.shape[0], use_multiprocessing=False, callbacks=[csv_logger])
+                                         max_queue_size=test_array.shape[0], use_multiprocessing=False)
         print("scores: {}".format(score))
         row_dict['filename'] = str(files[0])[:-4]
         row_dict['loss'] = score[0] #'loss'

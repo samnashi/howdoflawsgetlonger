@@ -230,7 +230,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 #!!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 1500 #how many times the training corpus is sampled.
+num_sequence_draws = 240 #how many times the training corpus is sampled.
 generator_batch_size = 256
 generator_batch_size_valid_x1 = (generator_batch_size + 128)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size + 128)
@@ -243,9 +243,9 @@ generator_batch_size_valid_x8 = (generator_batch_size + 128)
 generator_batch_size_valid_x9 = (generator_batch_size + 128)
 generator_batch_size_valid_x10 = (generator_batch_size + 128)
 generator_batch_size_valid_x11 = (generator_batch_size + 128)
-finetune = True
+finetune = False
 test_only = False #no training. if finetune is also on, this'll raise an error.
-use_precomp_sscaler = True
+use_precomp_sscaler = False
 sequence_circumnavigation_amt = 0.5
 save_preds = False
 save_figs = False
@@ -268,7 +268,7 @@ env = "blockade_runner" # "cruiser" "chan" #TODO complete the environment_variab
 
 #"_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
 #Weights_200_conv1d_samepad_1_128shortrun
-identifier_post_training = "_conv1d_selu_ww_finetune1"
+identifier_post_training = "_conv1d_selu_ww_adaptivess"
 #identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
 identifier_pre_training = "600_conv1d_selu_widewindow"  #for now, make hardcode what you want to finetune
 #@@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -368,14 +368,15 @@ combined_filenames = zip(data_filenames,label_filenames)
 #print("before shuffling: {}".format(combined_filenames))
 shuffle(combined_filenames)
 print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
-print('data loaded.')
+print('Data loaded.')
 
 if finetune==False:
     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+    print("Are weights (with the given name to be saved as) already present? {}".format(weights_present_indicator))
 else:
     weights_present_indicator = os.path.isfile('Weights_' + identifier_pre_training + '.h5')
+    print("Are weights (with the given name) to initialize with present? {}".format(weights_present_indicator))
 
-print("weights present? {}".format(weights_present_indicator))
 csv_logger = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
 
 if (finetune == False and weights_present_indicator == False) or (finetune == True and weights_present_indicator == True):
@@ -409,9 +410,8 @@ if (finetune == False and weights_present_indicator == False) or (finetune == Tr
                                             steps_per_epoch=sequence_circumnavigation_amt * (
                                             train_array.shape[0] // generator_batch_size), verbose=2,
                                             callbacks=[csv_logger])
-        # TODO extend training history.
 
-    if weights_present_indicator == False and finetune == True:
+    if weights_present_indicator == True and finetune == True:
         print("fine-tuning/partial training session completed.")
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         model.save_weights(weights_file_name)
@@ -427,6 +427,7 @@ if (finetune == False and weights_present_indicator == False) or (finetune == Tr
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         # test_weights_present_indicator
 
+print("weights_file_name is: {}".format(weights_file_name))
 if weights_file_name is not None:
     # means it went through the training loop
     if os.path.isfile(weights_file_name) == False:
@@ -434,8 +435,8 @@ if weights_file_name is not None:
         test_weights_present_indicator = True
         print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
         weights_to_test_with_fname = "weights retained in runtime memory"
-    test_weights_present_indicator = True  # retained in memory.
     if os.path.isfile(weights_file_name) == True:
+        test_weights_present_indicator = True
         print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
                                                                                         test_weights_present_indicator))
         weights_to_test_with_fname = weights_file_name
@@ -504,10 +505,6 @@ if test_weights_present_indicator == True:
         row_dict['mae'] = score[2]  # 'mean_absolute_error'
         row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
         score_rows_list.append(row_dict)
-
-        np.savetxt('TestResult_' + str(num_sequence_draws) + identifier_post_training + '.txt', np.asarray(score),
-                   fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
-                   footer=str(), comments='# ')
 
         # testing should start at 0. For now.
         test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,

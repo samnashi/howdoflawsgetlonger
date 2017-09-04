@@ -429,6 +429,7 @@ if weights_file_name is not None:
         test_weights_present_indicator = True
         print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
         weights_to_test_with_fname = "weights retained in runtime memory"
+
     test_weights_present_indicator = True #retained in memory.
     if os.path.isfile(weights_file_name) == True:
         print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
@@ -440,10 +441,8 @@ if test_only == True:
     model.load_weights(weights_to_test_with_fname, by_name=True)
 else:
     print("Warning: check input flags. No training has been done, and testing is "
-          "about to be performed with weights labeled as POST TRAINING weights")
+          "about to be performed with weights labeled as POST TRAINING weights.")
     test_weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
-
-csv_logger_test = CSVLogger(filename = './analysis/logtest' + identifier_post_training + ".csv", append=True)
 
 if test_weights_present_indicator == True:
     # the testing part
@@ -489,7 +488,7 @@ if test_weights_present_indicator == True:
             score = model.predict_on_batch(X_test_batch)
             # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
         score = model.evaluate_generator(test_generator, steps=(test_array.shape[0]//generator_batch_size),
-                                         max_queue_size=test_array.shape[0],use_multiprocessing=False,callbacks=[csv_logger_test])
+                                         max_queue_size=test_array.shape[0],use_multiprocessing=False)
         row_dict = {}
         print("scores: {}".format(score))
         row_dict['filename'] = str(files[0])[:-4]
@@ -500,8 +499,8 @@ if test_weights_present_indicator == True:
         score_rows_list.append(row_dict)
 
 
-        
-        #testing should start at 0. For now. 
+
+        #testing should start at 0. For now.
         test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at = 0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler)
         prediction_length = (int(1.0*(generator_batch_size * (label_array.shape[0]//generator_batch_size))))
         test_i=0
