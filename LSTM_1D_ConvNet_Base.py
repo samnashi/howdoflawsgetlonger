@@ -365,8 +365,8 @@ else:
 print("weights present? {}".format(weights_present_indicator))
 csv_logger_train = CSVLogger(filename = './analysis/logtrain' + identifier_post_training + ".csv", append=True)
 
-
-if (finetune == False and weights_present_indicator == False) or (finetune == True and weights_present_indicator == True):
+if (finetune == False and weights_present_indicator == False and test_only == False) or (
+        finetune == True and weights_present_indicator == True):
     print("TRAINING PHASE")
     print("weights_present_indicator: {}, finetune: {}".format(weights_present_indicator,finetune))
     for i in range(0,num_sequence_draws):
@@ -405,44 +405,47 @@ if (finetune == False and weights_present_indicator == False) or (finetune == Tr
             for key in training_hist.history:
                 training_hist.history[key].extend(training_hist_increment.history[key]) #thanks tom.
 
-    if weights_present_indicator == False and finetune == True:
+    if weights_present_indicator == True and finetune == True:
         print("fine-tuning/partial training session completed.")
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
-    if weights_present_indicator == False and finetune == False: #fresh training
+    if weights_present_indicator == False and finetune == False:  # fresh training
         print("FRESH training session completed.")
-        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_pre_training + '.h5'
+        weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
         model.save_weights(weights_file_name)
         print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                          weights_file_name))
-    else: # TESTING ONLY! bypass weights present indicator.
+    else:  # TESTING ONLY! bypass weights present indicator.
         weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
-        #test_weights_present_indicator
-#json.dump(training_hist.history, history_filename)
+        # test_weights_present_indicator
 
+print("weights_file_name before the if/else block to determine the test flag is: {}".format(weights_file_name))
 if weights_file_name is not None:
-    #means it went through the training loop
+    # means it went through the training loop
     if os.path.isfile(weights_file_name) == False:
         print("Weights from training weren't saved as .h5 but is retained in memory.")
         test_weights_present_indicator = True
         print("test_weights_present_indicator is {}".format(test_weights_present_indicator))
         weights_to_test_with_fname = "weights retained in runtime memory"
-
-    test_weights_present_indicator = True #retained in memory.
     if os.path.isfile(weights_file_name) == True:
+        test_weights_present_indicator = True
         print("test weights present indicator based on the presence of {} is {}".format(weights_file_name,
-                                                                        test_weights_present_indicator))
+                                                                                        test_weights_present_indicator))
         weights_to_test_with_fname = weights_file_name
         model.load_weights(weights_to_test_with_fname, by_name=True)
 if test_only == True:
     weights_to_test_with_fname = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
+    weights_file_name = weights_to_test_with_fname  # piggybacking the old flag. the one without fname is to refer to post training weights.
     model.load_weights(weights_to_test_with_fname, by_name=True)
-else:
-    print("Warning: check input flags. No training has been done, and testing is "
-          "about to be performed with weights labeled as POST TRAINING weights.")
-    test_weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+    test_weights_present_indicator = os.path.isfile(weights_to_test_with_fname)
+if weights_file_name == None:
+    print(
+        "Warning: check input flags. No training has been done, and testing is about to be performed with weights labeled as POST TRAINING weights")
+    test_weights_present_indicator = os.path.isfile(
+        'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+print("weights_file_name after the if/else block to determine the test flag is: {}".format(weights_file_name))
 
 if test_weights_present_indicator == True:
     # the testing part
