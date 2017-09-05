@@ -62,35 +62,38 @@ def conv_block_normal_param_count(input_tensor,conv_activation = 'selu', dense_a
     g = BatchNormalization()(d)
     h = Dense(1,activation='selu')(g)
     return h
-def conv_block_double_param_count(input_tensor,conv_activation = 'selu', dense_activation = 'elu'):
+def conv_block_double_param_count(input_tensor, conv_activation='selu', dense_activation='elu',feature_weighting=4):
     '''g means it's the output of the "twice the number of parameters"  branch'''
     b = Conv1D(64, kernel_size=(128), padding='valid', activation='selu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation='selu')(c) #gives me 128x1
+    d = Conv1D(32, kernel_size=(2), padding='valid', activation='selu')(c)  # gives me 128x1
     g = BatchNormalization()(d)
-    h = Dense(4,activation='selu')(g)
+    h = Dense(feature_weighting, activation='selu')(g)
     return h
 #-----------------------------------------------------------------------------------------------------------------------
 
 #---------------------NARROW WINDOW-------------------------------------------------------------------------------------
-def conv_block_double_param_count_narrow_window(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
+def conv_block_double_param_count_narrow_window(input_tensor, conv_activation='relu', dense_activation='elu',feature_weighting=4):
     '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
-    b = Conv1D(128, kernel_size=(32), padding='same', activation='relu')(input_tensor)
+    b = Conv1D(128, kernel_size=(32), padding='valid', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(16), padding='same', activation='relu')(c)
+    d = Conv1D(32, kernel_size=(16), padding='valid', activation='relu')(c)
     e = BatchNormalization()(d)
-    f = Conv1D(32, kernel_size=(8), padding='same', activation='relu')(e)
+    f = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(e)
     g = BatchNormalization()(f)
-    h = Dense(4,activation='relu')(g)
+    h = Dense(feature_weighting, activation='relu')(g)
     return h
-def conv_block_normal_param_count_narrow_window(input_tensor,conv_activation = 'relu', dense_activation = 'elu'):
+
+
+def conv_block_normal_param_count_narrow_window(input_tensor, conv_activation='relu', dense_activation='elu'):
     '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
-    b = Conv1D(64, kernel_size=(32), padding='same', activation='relu')(input_tensor)
+    b = Conv1D(64, kernel_size=(32), padding='valid', activation='relu')(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(8), padding='same', activation='relu')(c)
+    d = Conv1D(32, kernel_size=(8), padding='valid', activation='relu')(c)
     g = BatchNormalization()(d)
-    h = Dense(1,activation='relu')(g)
+    h = Dense(1, activation='relu')(g)
     return h
+
 #-----------------------------------------------------------------------------------------------------------------------
 
 #---------------------NARROW WINDOW AND CAUSAL--------------------------------------------------------------------------
