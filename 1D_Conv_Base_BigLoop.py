@@ -261,7 +261,7 @@ for z in range(0, len(param_dict_HLR['BS'])):
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 300  # how many times the training corpus is sampled.
+    num_sequence_draws = 500  # how many times the training corpus is sampled.
     generator_batch_size = bs
     # generator_batch_size_valid_x1 = (generator_batch_size)  # 4layer conv
     # generator_batch_size_valid_x2 = (generator_batch_size)
@@ -319,7 +319,7 @@ for z in range(0, len(param_dict_HLR['BS'])):
     image_path = "/home/ihsan/Documents/thesis_models/images"
     train_path = "/home/ihsan/Documents/thesis_models/train/"
     test_path = "/home/ihsan/Documents/thesis_models/test/"
-    analysis_path = "home/ihsan/Documents/thesis_models/analysis"
+    analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
     # %%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     # Base_Path = "/home/efi/Documents/thesis_models/"
     # image_path = "/home/efi/Documents/thesis_models/images"
@@ -377,7 +377,7 @@ for z in range(0, len(param_dict_HLR['BS'])):
     out = Dense(4)(g)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
-    plot_model(model, to_file='model_' + identifier_pre_training + '.png', show_shapes=True)
+    plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
     optimizer_used = adam(lr=0.005)
     model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))

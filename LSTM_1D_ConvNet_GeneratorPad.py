@@ -291,7 +291,7 @@ Base_Path = "/home/ihsan/Documents/thesis_models/"
 image_path = "/home/ihsan/Documents/thesis_models/images"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
 test_path = "/home/ihsan/Documents/thesis_models/test/"
-analysis_path = "home/ihsan/Documents/thesis_models/analysis"
+analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
 #%%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Base_Path = "/home/efi/Documents/thesis_models/"
 # image_path = "/home/efi/Documents/thesis_models/images"
@@ -348,7 +348,7 @@ out = reference_bilstm(input_tensor=g)
 
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
-plot_model(model, to_file='model_' + identifier_pre_training + '.png',show_shapes=True)
+plot_model(model, to_file= analysis_path + 'model_' + identifier_pre_training + '.png',show_shapes=True)
 optimizer_used = adam(lr=0.003)
 model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
 print("Model summary: {}".format(model.summary()))
