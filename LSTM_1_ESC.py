@@ -114,17 +114,20 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 50 #how many times the training corpus is sampled.
-generator_batch_size = 256
+num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
+num_sequence_draws = 150 #how many times the training corpus is sampled.
+generator_batch_size = 128
 finetune = False
 no_repeats_in_training_set = False
+use_precomp_sscaler = True
+seq_circnav_amt = 2
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 identifier_finetune_init = '_3c3_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
-identifier = "_3c3_nonlinonly_fv1b_" #weight name to save as
+identifier = "_3d_adam_fv1b_" #weight name to save as
 Base_Path = "./"
 train_path = "./train/"
 test_path = "./test/"
+history_filename = "./analysis/training_history" + identifier + ".json"
 #^^^^^^^^^^^^^^^^^^^^ ABSOLUTE PATHS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #train_path = "/home/efi/Documents/thesis_models/train/"
 #test_path = "/home/efi/Documents/thesis_models/test/"
@@ -164,7 +167,7 @@ d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
 #keras_optimizer = rmsprop(lr=0.0020, rho=0.9, epsilon=1e-08, decay=0.0)
-keras_optimizer = adam(lr=0.0020, decay=0.001)
+keras_optimizer = adam(lr=0.003) #keras_optimizer = adam(lr=0.0020, decay=0.001)
 
 model = Model(inputs=a,outputs=out)
 model.compile(loss='mse', optimizer=keras_optimizer,metrics=['accuracy','mae','mape','mse'])
@@ -177,7 +180,7 @@ plot_model(model, to_file='model_' + identifier + '.png',show_shapes=True)
 #print ("Actual input: {}".format(data.shape))
 #print ("Actual output: {}".format(target.shape))
 weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
-print('loading data.')
+print('Data loaded. weight_present_indicator: {} , finetune: {}'.format(weights_present_indicator, finetune))
 # if finetune == False:
 #     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
 #     #later line for more logic flow stuff
@@ -195,23 +198,24 @@ if weights_present_indicator == False:
         label_load_path = train_path + '/label/' + files[1]
         #print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
         train_array = np.load(data_load_path)
-        label_array = np.load(label_load_path)[:,1:] #,1: is an artifact, StepIndex is dropped, was only there to ensure rigidity
+        label_array = np.load(label_load_path)[:, 1:] #,1: is an artifact, StepIndex is dropped, was only there to ensure rigidity
         #-----------COMMENT THESE OUT IF YOU WANT RESCALER ON----------------------------------
         #train_array = np.reshape(train_array,(1,train_array.shape[0],train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
         #--------------------------------------------------------------------------------------
         print("filename: {}, data/label shape: {}, {}, draw #: {}".format(str(files[0]),train_array.shape,label_array.shape, i))
         start_at_nonlinear_only = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
+        #start_at =
 
         if finetune == True: #load the weights
-            finetune_init_weights_filename = 'Weights_' + str(500) + identifier_finetune_init + '.h5'
+            finetune_init_weights_filename = 'Weights_' + str(650) + identifier_finetune_init + '.h5'
             model.load_weights(finetune_init_weights_filename, by_name=True)
 
         #generator_starting_index = train_array.shape[1] - 1 - shortest_length #steps per epoch is how many times that generator is called #train_array.shape[0]//generator_batch_size
         if i == 0 :
-            training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size, use_precomputed_coeffs=True), epochs=num_epochs, steps_per_epoch= 3 * (train_array.shape[0] // generator_batch_size), verbose=2)
+            training_hist = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=start_at_nonlinear_only, generator_batch_size=generator_batch_size, use_precomputed_coeffs=use_precomp_sscaler), epochs=num_epochs, steps_per_epoch= seq_circnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2)
         else:
-            training_hist_increment = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=0, generator_batch_size=generator_batch_size), epochs=num_epochs, steps_per_epoch= 3 * (train_array.shape[0] // generator_batch_size), verbose=2)
+            training_hist_increment = model.fit_generator(pair_generator_lstm(train_array, label_array, start_at=start_at_nonlinear_only, generator_batch_size=generator_batch_size,use_precomputed_coeffs=use_precomp_sscaler), epochs=num_epochs, steps_per_epoch= seq_circnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2)
             for key in training_hist.history:
                 training_hist.history[key].extend(training_hist_increment.history[key]) #thanks tom.
         #TODO: extend training hist
@@ -267,7 +271,8 @@ if weights_present_indicator == False:
     #plt.savefig(Base_Path + 'results/loss_' + str(num_sequence_draws) + identifier + '.png', bbox_inches='tight')
     plt.clf()
 
-weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier + '.h5')
+json.dump(training_hist.history, history_filename)
+weights_present_indicator = os.path.isfile(weights_file_name)
 #weights_present_indicator = True
 if weights_present_indicator == True: #TODO: finetune related options here.
     #the testing part
