@@ -35,6 +35,27 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
+def reference_bilstm_small(input_tensor):
+    '''reference SMALL BiLSTM with batchnorm and elu TD-dense. Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(64, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(64, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(16, kernel_initializer=lecun_normal(seed=1337), activation='sigmoid'))(j)
+    l = BatchNormalization()(k)
+    out = Dense(4)(l)
+    return out
+
+def reference_bilstm_big(input_tensor):
+    '''reference BiLSTM with batchnorm and elu TD-dense. Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(200, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(200, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=lecun_normal(seed=1337), activation='sigmoid'))(j)
+    l = BatchNormalization()(k)
+    out = Dense(4)(l)
+    return out
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu'):
@@ -240,13 +261,13 @@ param_dict_list = []
 param_dict_HLR['BS'] = [1024,1024,1024,1024,1024,1024,512,512,512,512,512,512,256,256,256,256,256,256]
 param_dict_HLR['FW'] = [4,3,2,4,3,2,4,3,2,4,3,2,4,3,2,4,3,2]
 param_dict_HLR['GP'] = [128,128,128,32,32,32,128,128,128,32,32,32,128,128,128,32,32,32]
-#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad. 
+#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = []
 param_dict_HLR['id_post'] = []
 
 for z in range(0, len(param_dict_HLR['BS'])):
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
-    id_post = "sd_1dconvquadfilters_" + str(param_dict_HLR['BS'][z]) + "_FW_" + str(param_dict_HLR['FW'][z]) + "_GP_" + \
+    id_post = "sd_1dconvsmalllstm_" + str(param_dict_HLR['BS'][z]) + "_FW_" + str(param_dict_HLR['FW'][z]) + "_GP_" + \
               str(param_dict_HLR['GP'][z]) + "_HLR"
     param_dict_HLR['id_post'].append(id_post)
 
@@ -374,7 +395,7 @@ for z in range(0, len(param_dict_HLR['BS'])):
 
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    out = Dense(4)(g)
+    out = reference_bilstm_small(input_tensor=g)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
