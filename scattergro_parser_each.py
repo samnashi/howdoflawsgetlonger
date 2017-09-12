@@ -32,9 +32,9 @@ def parse_scattergro(save_arrays = True, analysis_mode = False, feature_identifi
 
     #------------------------------------------ END OF PASTED PART----------------------------------------
 
-    raw_path = "/home/ihsan/Documents/thesis_generator/results/to_process/"
+    raw_path = "/home/efi/Documents/thesis_generator/results/to_process/"
 
-    processed_path = "/home/ihsan/Documents/thesis_models/unsplit"
+    processed_path = "/home/efi/Documents/thesis_models/unsplit"
     #processed_path = '/media/ihsan/LID_FLASH_1/Thesis/thesis_generator/results/run_2/processed/'
     items = os.listdir(raw_path)
     items.sort()
@@ -249,5 +249,5 @@ def parse_scattergro(save_arrays = True, analysis_mode = False, feature_identifi
         json.dump(seq_entire_params, open(seq_entire_params_filename, 'wb'))
 
 if __name__ == "__main__":
-    parse_scattergro(save_arrays=False,analysis_mode=True)
+    parse_scattergro(save_arrays=True, analysis_mode=True)
 

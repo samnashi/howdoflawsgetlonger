@@ -33,9 +33,9 @@ def set_standalone_scaler_params(output_scaler):
 
 def reference_bilstm(input_tensor):
     '''reference BiLSTM with batchnorm and elu TD-dense. Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = Bidirectional(LSTM(200, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(input_tensor)
+    h = Bidirectional(LSTM(500, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(input_tensor)
     i = BatchNormalization()(h)
-    j = Bidirectional(LSTM(200, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(i)
+    j = Bidirectional(LSTM(500, kernel_initializer=lecun_normal(seed=1337), return_sequences=True))(i)
     j = BatchNormalization()(j)
     k = TimeDistributed(Dense(64, kernel_initializer=lecun_normal(seed=1337), activation='selu'))(j)
     l = BatchNormalization()(k)
@@ -119,7 +119,7 @@ def conv_block_double_param_count_narrow_window_causal(input_tensor,conv_activat
     return h
 
 
-def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
+def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='minmax', use_precomputed_coeffs = True): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -135,8 +135,10 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
             label_scaler = sklearn.preprocessing.StandardScaler()
         elif scaler_type == 'minmax':
             scaler = sklearn.preprocessing.MinMaxScaler()
+            label_scaler = sklearn.preprocessing.MinMaxScaler()
         elif scaler_type == 'robust':
             scaler = sklearn.preprocessing.RobustScaler()
+            label_scaler = sklearn.preprocessing.RobustScaler()
         else:
             scaler = sklearn.preprocessing.StandardScaler()
         #print("scaled: {}, scaler_type: {}".format(scaled,scaler_type))
@@ -167,11 +169,11 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         scaler_scale.insert(0, scaler_step_index_only.scale_)
         scaler.scale_ = np.asarray(scaler_scale, dtype='float32')
         #print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
-        data_scaled = scaler.transform(X=data,y=None)
-        labels_scaled = label_scaler.transform(X=labels,y=None)
+        data_scaled = scaler.transform(X=data)
+        labels_scaled = label_scaler.transform(X=labels)
     if use_precomputed_coeffs == False:
-        data_scaled = scaler.fit_transform(X=data, y=None)
-        labels_scaled = label_scaler.fit_transform(X=labels, y=None)
+        data_scaled = scaler.fit_transform(X=data)
+        labels_scaled = label_scaler.fit_transform(X=labels)
         #--------i think expand dims is a lot less implicit, that's why i commented these out-------
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
@@ -230,8 +232,8 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 #!!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 240 #how many times the training corpus is sampled.
-generator_batch_size = 256
+num_sequence_draws = 700 #how many times the training corpus is sampled.
+generator_batch_size = 128
 generator_batch_size_valid_x1 = (generator_batch_size + 128)#4layer conv
 generator_batch_size_valid_x2 = (generator_batch_size + 128)
 generator_batch_size_valid_x3 = (generator_batch_size + 128)#4layer conv
@@ -244,7 +246,7 @@ generator_batch_size_valid_x9 = (generator_batch_size + 128)
 generator_batch_size_valid_x10 = (generator_batch_size + 128)
 generator_batch_size_valid_x11 = (generator_batch_size + 128)
 finetune = False
-test_only = True #no training. if finetune is also on, this'll raise an error.
+test_only = False #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = False
 sequence_circumnavigation_amt = 0.5
 save_preds = False
@@ -268,15 +270,15 @@ env = "blockade_runner" # "cruiser" "chan" #TODO complete the environment_variab
 
 #"_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
 #Weights_200_conv1d_samepad_1_128shortrun
-identifier_post_training = "_conv1d_selu_ww_adaptivess"
+identifier_post_training = "_conv1d_biglstm_ww_128bs_minmaxscaler_adaptive"
 #identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
 identifier_pre_training = "240600_conv1d_selu_widewindow"  #for now, make hardcode what you want to finetune
 #@@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# Base_Path = "./"
-# image_path = "./images/"
-# train_path = "./train/"
-# test_path = "./test/"
-# analysis_path = "./analysis."
+Base_Path = "./"
+image_path = "./images/"
+train_path = "./train/"
+test_path = "./test/"
+analysis_path = "./analysis."
 #^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Base_Path = "/home/devin/Documents/PITTA LID/"
 # image_path = "/home/devin/Documents/PITTA LID/img/"
@@ -284,11 +286,11 @@ identifier_pre_training = "240600_conv1d_selu_widewindow"  #for now, make hardco
 # test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
 # test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
 #+++++++++++++ TO RUN ON LOCAL (IHSAN) +++++++++++++++++++++++++++++++
-Base_Path = "/home/ihsan/Documents/thesis_models/"
-image_path = "/home/ihsan/Documents/thesis_models/images"
-train_path = "/home/ihsan/Documents/thesis_models/train/"
-test_path = "/home/ihsan/Documents/thesis_models/test/"
-analysis_path = "home/ihsan/Documents/thesis_models/analysis"
+# Base_Path = "/home/ihsan/Documents/thesis_models/"
+# image_path = "/home/ihsan/Documents/thesis_models/images"
+# train_path = "/home/ihsan/Documents/thesis_models/train/"
+# test_path = "/home/ihsan/Documents/thesis_models/test/"
+# analysis_path = "home/ihsan/Documents/thesis_models/analysis"
 #%%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Base_Path = "/home/efi/Documents/thesis_models/"
 # image_path = "/home/efi/Documents/thesis_models/images"
@@ -346,7 +348,7 @@ out = reference_bilstm(input_tensor=g)
 
 model = Model(inputs=[a1,a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
 plot_model(model, to_file='model_' + identifier_pre_training + '.png',show_shapes=True)
-optimizer_used = adam(lr=0.003)
+optimizer_used = adam(lr=0.002)
 model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
 print("Model summary: {}".format(model.summary()))
 
@@ -543,7 +545,7 @@ if test_weights_present_indicator == True:
         scaler_output = sklearn.preprocessing.StandardScaler()  # TODO: this should use the precomputed coeffs as well...
         scaler_output = set_standalone_scaler_params(scaler_output)
         # print("")
-        label_truth = scaler_output.transform(X=label_truth_temp, y=None)
+        label_truth = scaler_output.transform(X=label_truth_temp)
 
         resample_interval = 16
         label_truth = label_truth[::resample_interval, :]
