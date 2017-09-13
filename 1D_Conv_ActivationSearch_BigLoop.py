@@ -231,26 +231,36 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (y.shape[1] == generator_batch_size)
         yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
-#TODO adaptive
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 #string format: BS +
-param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128]
-param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2]
-param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128]
-param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu']
-param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
-param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3]
-param_dict_HLR['KernelReg']=[None,None,None,None,None,None,None]
+param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
+param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
+param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
+param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
+param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+param_dict_HLR['KernelReg']=[l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
+reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post = "_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
-        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['KernelReg'][z]) + "_kr_HLR"
+    id_post_temp = "_minmax_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
+    if param_dict_HLR['KernelReg'][z] != None:
+        if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
+            reg_id = "l1l2"
+        if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] == 0.0:
+            reg_id = "l1"
+        if (param_dict_HLR['KernelReg'][z].get_config())['l1'] == 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
+            reg_id = "l2"
+        id_post = id_post_temp + reg_id + "_kr_HLR"
+    if param_dict_HLR['KernelReg'][z] == None:
+        id_post = id_post_temp + str(param_dict_HLR['KernelReg'][z]) + "_kr_HLR"
     #below is the initial gridsearch params.
     # id_post = "_" + str(param_dict_HLR['BatchSize'][z]) + "_FeatWeight_" + str(param_dict_HLR['FeatWeight'][z]) + "_GenPad_" + \
     #           str(param_dict_HLR['GenPad'][z]) + "_HLR"
@@ -274,8 +284,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 1  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 4  # how many times the training corpus is sampled.
+    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 1000  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -284,7 +294,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
-        aux_circumnav_onset_draw = 3
+        aux_circumnav_onset_draw = 600
         assert(aux_circumnav_onset_draw < num_sequence_draws)
         aux_seq_circumnav_amt = 2.0 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -314,11 +324,11 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
     identifier_pre_training = id_pre  # for now, make hardcode what you want to finetune
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    # Base_Path = "./"
-    # image_path = "./images/"
-    # train_path = "./train/"
-    # test_path = "./test/"
-    # analysis_path = "./analysis."
+    Base_Path = "./"
+    image_path = "./images/"
+    train_path = "./train/"
+    test_path = "./test/"
+    analysis_path = "./analysis/"
     # ^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     # Base_Path = "/home/devin/Documents/PITTA LID/"
     # image_path = "/home/devin/Documents/PITTA LID/img/"
@@ -326,11 +336,11 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
     # test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
     # +++++++++++++ TO RUN ON LOCAL (IHSAN) +++++++++++++++++++++++++++++++
-    Base_Path = "/home/ihsan/Documents/thesis_models/"
-    image_path = "/home/ihsan/Documents/thesis_models/images"
-    train_path = "/home/ihsan/Documents/thesis_models/train/"
-    test_path = "/home/ihsan/Documents/thesis_models/test/"
-    analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
+    # Base_Path = "/home/ihsan/Documents/thesis_models/"
+    # image_path = "/home/ihsan/Documents/thesis_models/images"
+    # train_path = "/home/ihsan/Documents/thesis_models/train/"
+    # test_path = "/home/ihsan/Documents/thesis_models/test/"
+    # analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
     # %%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     # Base_Path = "/home/efi/Documents/thesis_models/"
     # image_path = "/home/efi/Documents/thesis_models/images"
@@ -396,11 +406,10 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
 
     # define the model first
-
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    g = Dense(8,activation=da)
-    out = Dense(4)(g)
+    h = Dense(16,activation=da,kernel_regularizer=kr)(g)
+    out = Dense(4)(h)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
@@ -470,7 +479,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
             train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
                                                          generator_batch_size=generator_batch_size,
-                                                         use_precomputed_coeffs=use_precomp_sscaler)
+                                                         use_precomputed_coeffs=use_precomp_sscaler,scaler_type='minmax')
             training_hist = model.fit_generator(train_generator, epochs=num_epochs,
                                                 steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2,
                                                 callbacks=[csv_logger])
@@ -605,14 +614,14 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             scaler_output = sklearn.preprocessing.StandardScaler()  # TODO: this should use the precomputed coeffs as well...
             scaler_output = set_standalone_scaler_params(scaler_output)
             # print("")
-            label_truth = scaler_output.transform(X=label_truth_temp, y=None)
+            label_truth = scaler_output.transform(X=label_truth_temp)
 
             resample_interval = 16
             label_truth = label_truth[::resample_interval, :]
             y_prediction = y_prediction[::resample_interval, :]
 
         score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
-        score_df.to_csv('scores_lstm_' + identifier_post_training + '.csv')
+        score_df.to_csv('scores_conv_' + identifier_post_training + '.csv')
         # print(len(y_prediction))
 
 
