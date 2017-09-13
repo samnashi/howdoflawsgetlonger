@@ -8,6 +8,7 @@ from keras.utils import plot_model
 from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional, Dense, Dropout, \
     Activation, Flatten, Conv1D, MaxPooling1D, GlobalAveragePooling1D, AveragePooling1D, concatenate, BatchNormalization
 from keras.initializers import lecun_normal, glorot_normal
+from keras.regularizers import l1, l1_l2, l2
 from keras import metrics
 from keras.optimizers import adam
 import pandas as pd
@@ -37,77 +38,70 @@ def set_standalone_scaler_params(output_scaler):
 
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
-def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu'):
+def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''f means it's the normal param count branch'''
-    b = Conv1D(32, kernel_size=(128), padding='valid', activation=conv_act)(input_tensor)
+    b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation=conv_act)(c)  # gives me 128x1
+    d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
     g = BatchNormalization()(d)
     h = Dense(1, activation=dense_act)(g)
     return h
 
 
-def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4):
+def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None):
     '''g means it's the output of the "twice the number of parameters"  branch'''
-    b = Conv1D(32, kernel_size=(128), padding='valid', activation=conv_act)(input_tensor)
+    b = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation=conv_act)(c)  # gives me 128x1
+    d = Conv1D(32, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
     g = BatchNormalization()(d)
     h = Dense(feature_weighting, activation=dense_act)(g)
     return h
 
-
 # -----------------------------------------------------------------------------------------------------------------------
-
-# ---------------------NARROW WINDOW-------------------------------------------------------------------------------------
-def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4):
-    '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
-    b = Conv1D(512, kernel_size=(32), padding='valid', activation=conv_act)(input_tensor)
+#add in regularizers..
+def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
+    '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
+    b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation=conv_act)(c)
+    d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
     e = BatchNormalization()(d)
-    f = Dense(feature_weighting, activation=dense_act)(e)
-    return f
-
-
-def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu'):
-    '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
-    b = Conv1D(256, kernel_size=(32), padding='valid', activation=conv_act)(input_tensor)
-    c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(2), padding='valid', activation=conv_act)(c)
-    e = BatchNormalization()(d)
-    f = Dense(1, activation=dense_act)(e)
-    return f
-
-
-# -----------------------------------------------------------------------------------------------------------------------
-
-# ---------------------NARROW WINDOW AND CAUSAL--------------------------------------------------------------------------
-def conv_block_normal_param_count_narrow_window_causal(input_tensor, conv_activation='relu', dense_activation='elu'):
-    '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
-    # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
-    b = Conv1D(64, kernel_size=(8), padding='causal', activation='relu')(input_tensor)
-    c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(c)
-    e = BatchNormalization()(d)
-    # f = UpSampling1D(size=2)(e)
-    g = BatchNormalization()(e)
-    h = Dense(1, activation='relu')(g)
-    return h
-
-
-def conv_block_double_param_count_narrow_window_causal(input_tensor, conv_activation='relu', dense_activation='elu'):
-    '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
-    # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
-    b = Conv1D(128, kernel_size=(15), padding='causal', activation='relu')(input_tensor)
-    c = BatchNormalization()(b)
-    d = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(c)
-    e = Conv1D(32, kernel_size=(8), padding='causal', activation='relu')(d)
-    f = BatchNormalization()(e)
-    # f = UpSampling1D(size=2)(e)
+    f = Conv1D(32, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(e)  # gives me 128x1
     g = BatchNormalization()(f)
-    h = Dense(4, activation='relu')(g)
+    h = Dense(1, activation=dense_act)(g)
     return h
+
+
+def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
+    '''g means it's the output of the "twice the number of parameters"  branch'''
+    b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(64, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(e)  # gives me 128x1
+    g = BatchNormalization()(f)
+    h = Dense(feature_weighting, activation=dense_act)(g)
+    return h
+# ---------------------NARROW WINDOW-------------------------------------------------------------------------------------
+def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
+    '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
+    b = Conv1D(8, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
+    g = BatchNormalization()(d)
+    h = Dense(1, activation=dense_act)(g)
+    return h
+
+def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
+    '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
+    b = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(32, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
+    g = BatchNormalization()(d)
+    h = Dense(feature_weighting, activation=dense_act)(g)
+    return h
+
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 
 def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type='standard',
@@ -241,51 +235,60 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 #string format: BS +
-param_dict_HLR['BS'] = [128,128,128,128,128,128,128]
-param_dict_HLR['FW'] = [4,3,2,4,3,2,4,3,2,4,3,2,4,3,2,4,3,2]
-param_dict_HLR['GP'] = [128,128,128,32,32,32,128,128,128,32,32,32,128,128,128,32,32,32]
-#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad. 
+param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128]
+param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2]
+param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128]
+param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu']
+param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
+param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3]
+param_dict_HLR['KernelReg']=[None,None,None,None,None,None,None]
+#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
 
-for z in range(0, len(param_dict_HLR[0])): #come up with a
+for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    # id_post = "_" + str(param_dict_HLR['ConvAct']) + "_ca_" + str(param_dict_HLR['DenseAct']) + "_da_" + \
-    #     str(param_dict_HLR['ConvBlockDepth']) + "_cbd_HLR"
+    id_post = "_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['KernelReg'][z]) + "_kr_HLR"
     #below is the initial gridsearch params.
-    id_post = "_" + str(param_dict_HLR['BS'][z]) + "_FW_" + str(param_dict_HLR['FW'][z]) + "_GP_" + \
-              str(param_dict_HLR['GP'][z]) + "_HLR"
+    # id_post = "_" + str(param_dict_HLR['BatchSize'][z]) + "_FeatWeight_" + str(param_dict_HLR['FeatWeight'][z]) + "_GenPad_" + \
+    #           str(param_dict_HLR['GenPad'][z]) + "_HLR"
     param_dict_HLR['id_post'].append(id_post)
 
-for z in range(0, len(param_dict_HLR['BS'])):
+#check lengths after the idpre and idpost aren't blank anymore.
+for key in param_dict_HLR.keys():
+    assert(len(param_dict_HLR[key]) == len(param_dict_HLR['BatchSize']))
+
+for z in range(0, len(param_dict_HLR['BatchSize'])):
     #********************* READ FROM THE PARAMETER DICT ********************************************************************
-    gen_pad = param_dict_HLR['GP'][z]
-    bs = param_dict_HLR['BS'][z]
-    fw = param_dict_HLR['FW'][z]
+    gen_pad = param_dict_HLR['GenPad'][z]
+    bs = param_dict_HLR['BatchSize'][z]
+    fw = param_dict_HLR['FeatWeight'][z]
     id_pre = param_dict_HLR['id_pre'][z]
     id_post = param_dict_HLR['id_post'][z]
+    cbd = param_dict_HLR['ConvBlockDepth'][z]
+    kr = param_dict_HLR['KernelReg'][z]
+    da = param_dict_HLR['DenseAct'][z]
+    ca = param_dict_HLR['ConvAct'][z]
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 500  # how many times the training corpus is sampled.
+    num_epochs = 1  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 4  # how many times the training corpus is sampled.
     generator_batch_size = bs
-    # generator_batch_size_valid_x1 = (generator_batch_size)  # 4layer conv
-    # generator_batch_size_valid_x2 = (generator_batch_size)
-    # generator_batch_size_valid_x3 = (generator_batch_size)  # 4layer conv
-    # generator_batch_size_valid_x4 = (generator_batch_size)
-    # generator_batch_size_valid_x5 = (generator_batch_size)  # 4layer conv
-    # generator_batch_size_valid_x6 = (generator_batch_size)
-    # generator_batch_size_valid_x7 = (generator_batch_size)  # 4layer conv
-    # generator_batch_size_valid_x8 = (generator_batch_size)
-    # generator_batch_size_valid_x9 = (generator_batch_size)
-    # generator_batch_size_valid_x10 = (generator_batch_size)
-    # generator_batch_size_valid_x11 = (generator_batch_size)
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     use_precomp_sscaler = False
-    sequence_circumnavigation_amt = 0.5
+
+    base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
+    adaptive_circumnav = True
+    if adaptive_circumnav == True:
+        aux_circumnav_onset_draw = 3
+        assert(aux_circumnav_onset_draw < num_sequence_draws)
+        aux_seq_circumnav_amt = 2.0 #only used if adaptive_circumnav is True
+        assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
+
     save_preds = False
     save_figs = False
     env = "blockade_runner"  # "cruiser" "chan" #TODO complete the environment_variable_setter
@@ -351,42 +354,57 @@ for z in range(0, len(param_dict_HLR['BS'])):
     a10 = Input(shape=(None, 1))
     a11 = Input(shape=(None, 1))
 
-    if gen_pad == 128:
-        g1 = conv_block_double_param_count(input_tensor=a1,feature_weighting=fw)
-        f2 = conv_block_normal_param_count(input_tensor=a2)
-        g3 = conv_block_double_param_count(input_tensor=a3,feature_weighting=fw)
-        f4 = conv_block_normal_param_count(input_tensor=a4)
-        g5 = conv_block_double_param_count(input_tensor=a5,feature_weighting=fw)
-        f6 = conv_block_normal_param_count(input_tensor=a6)
-        g7 = conv_block_double_param_count(input_tensor=a7,feature_weighting=fw)
-        f8 = conv_block_normal_param_count(input_tensor=a8)
-        f9 = conv_block_normal_param_count(input_tensor=a9)
-        f10 = conv_block_normal_param_count(input_tensor=a10)
-        f11 = conv_block_normal_param_count(input_tensor=a11)
+    #two loops. 2 vs. 3 layers.
+    if cbd == 2:
+        if gen_pad == 128:
+            g1 = conv_block_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f2 = conv_block_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+            g3 = conv_block_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f4 = conv_block_normal_param_count(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+            g5 = conv_block_double_param_count(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f6 = conv_block_normal_param_count(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+            g7 = conv_block_double_param_count(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f8 = conv_block_normal_param_count(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+            f9 = conv_block_normal_param_count(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+            f10 = conv_block_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+            f11 = conv_block_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
+    if cbd == 3:
+        if gen_pad == 128:
+            g1 = conv_block_3layers_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f2 = conv_block_3layers_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+            g3 = conv_block_3layers_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f4 = conv_block_3layers_normal_param_count(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+            g5 = conv_block_3layers_double_param_count(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f6 = conv_block_3layers_normal_param_count(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+            g7 = conv_block_3layers_double_param_count(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f8 = conv_block_3layers_normal_param_count(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+            f9 = conv_block_3layers_normal_param_count(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+            f10 = conv_block_3layers_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+            f11 = conv_block_3layers_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     else:
-        g1 = conv_block_double_param_count_narrow_window(input_tensor=a1,feature_weighting=fw)
-        f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2)
-        g3 = conv_block_double_param_count_narrow_window(input_tensor=a3,feature_weighting=fw)
-        f4 = conv_block_normal_param_count_narrow_window(input_tensor=a4)
-        g5 = conv_block_double_param_count_narrow_window(input_tensor=a5,feature_weighting=fw)
-        f6 = conv_block_normal_param_count_narrow_window(input_tensor=a6)
-        g7 = conv_block_double_param_count_narrow_window(input_tensor=a7,feature_weighting=fw)
-        f8 = conv_block_normal_param_count_narrow_window(input_tensor=a8)
-        f9 = conv_block_normal_param_count_narrow_window(input_tensor=a9)
-        f10 = conv_block_normal_param_count_narrow_window(input_tensor=a10)
-        f11 = conv_block_normal_param_count_narrow_window(input_tensor=a11)
-
+        g1 = conv_block_double_param_count_narrow_window(input_tensor=a1, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+        f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+        g3 = conv_block_double_param_count_narrow_window(input_tensor=a3, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+        f4 = conv_block_normal_param_count_narrow_window(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+        g5 = conv_block_double_param_count_narrow_window(input_tensor=a5, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+        f6 = conv_block_normal_param_count_narrow_window(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+        g7 = conv_block_double_param_count_narrow_window(input_tensor=a7, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+        f8 = conv_block_normal_param_count_narrow_window(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+        f9 = conv_block_normal_param_count_narrow_window(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+        f10 = conv_block_normal_param_count_narrow_window(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+        f11 = conv_block_normal_param_count_narrow_window(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
 
     # define the model first
 
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
+    g = Dense(8,activation=da)
     out = Dense(4)(g)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
-    optimizer_used = adam(lr=0.005)
+    optimizer_used = adam(lr=0.002)
     model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))
 
@@ -419,11 +437,15 @@ for z in range(0, len(param_dict_HLR['BS'])):
         print("Are weights (with the given name) to initialize with present? {}".format(weights_present_indicator))
 
     csv_logger = CSVLogger(filename='./analysis/logtrain' + identifier_post_training + ".csv", append=True)
+    active_seq_circumnav_amt = 0.0 #predeclare a float.
 
     if (finetune == False and weights_present_indicator == False and test_only == False) or (
             finetune == True and weights_present_indicator == True):
         print("TRAINING PHASE")
         print("weights_present_indicator: {}, finetune: {}".format(weights_present_indicator, finetune))
+
+        active_seq_circumnav_amt = base_seq_circumnav_amt #active is the one given to the generator..
+        #adaptive or not, it starts the same way (at the base rate)
         for i in range(0, num_sequence_draws):
             index_to_load = np.random.randint(0, len(combined_filenames))  # switch to iterations
             files = combined_filenames[index_to_load]
@@ -437,10 +459,11 @@ for z in range(0, len(param_dict_HLR['BS'])):
             # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
 
+            if adaptive_circumnav == True and i >= aux_circumnav_onset_draw:
+                active_seq_circumnav_amt = aux_seq_circumnav_amt
 
             nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
             shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
-
             if finetune == True:  # load the weights
                 finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
                 model.load_weights(finetune_init_weights_filename, by_name=True)
@@ -449,8 +472,7 @@ for z in range(0, len(param_dict_HLR['BS'])):
                                                          generator_batch_size=generator_batch_size,
                                                          use_precomputed_coeffs=use_precomp_sscaler)
             training_hist = model.fit_generator(train_generator, epochs=num_epochs,
-                                                steps_per_epoch=sequence_circumnavigation_amt * (
-                                                    train_array.shape[0] // generator_batch_size), verbose=2,
+                                                steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2,
                                                 callbacks=[csv_logger])
 
         if weights_present_indicator == True and finetune == True:
