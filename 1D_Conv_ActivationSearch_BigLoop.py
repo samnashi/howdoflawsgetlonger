@@ -240,7 +240,7 @@ param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,
 param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
 param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
 param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-param_dict_HLR['KernelReg']=[l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
+param_dict_HLR['KernelReg']=[None,None,None,None,None,None,None,None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
@@ -249,7 +249,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_minmax_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_minmax_bigdense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -284,8 +284,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 1000  # how many times the training corpus is sampled.
+    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 600  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -294,9 +294,9 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
-        aux_circumnav_onset_draw = 600
+        aux_circumnav_onset_draw = 450
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 2.0 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 1.0 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
     save_preds = False
@@ -408,12 +408,12 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # define the model first
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    h = Dense(16,activation=da,kernel_regularizer=kr)(g)
+    h = Dense(64,activation=da,kernel_regularizer=kr)(g)
     out = Dense(4)(h)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
-    optimizer_used = adam(lr=0.002)
+    optimizer_used = adam(lr=0.0025)
     model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))
 

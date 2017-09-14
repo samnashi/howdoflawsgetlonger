@@ -11,6 +11,7 @@ from scattergro_parser_each import parse_scattergro
 import matplotlib.pyplot as plt
 import pprint
 
+
 '''Characterizes sequences. Calculates the relevant statistics.'''
 
 def generator_chunker(array_raw, chunker_batch_size, start_at = 0):
