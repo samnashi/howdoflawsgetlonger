@@ -7,7 +7,7 @@ from itertools import combinations_with_replacement
 
 #modifying the scattergro parser so that it reads numpy arrays (from the training corpus) instead.
 
-def analyze_corpus(save_arrays=True, analysis_mode=False, feature_identifier='FVX', use_data_in_model_folder=False):
+def analyze_corpus(save_arrays=False, analysis_mode=True, feature_identifier='FVX', use_data_in_model_folder=True):
     '''Cuts apart the lumped arrays. If analysis_mode is True, it'll return the intermediate arrays and indices,
      for corpus_characterizer to do its thing. '''
     # raw_path = "/home/ihsan/Documents/thesis_generator/results/devin/to_process/" #needs the absolute path, no tildes!
@@ -20,10 +20,10 @@ def analyze_corpus(save_arrays=True, analysis_mode=False, feature_identifier='FV
 
     # ------------------------------------------ END OF PASTED PART----------------------------------------
 
-    data_path = "/home/ihsan/Documents/thesis_models/train/data/"
-    label_path = "/home/ihsan/Documents/thesis_models/train/label/"
+    data_path = "./train/data/"
+    label_path = "./train/label/"
 
-    processed_path = "/home/ihsan/Documents/thesis_models/analysis/"
+    processed_path = "./analysis/"
     # processed_path = '/media/ihsan/LID_FLASH_1/Thesis/thesis_generator/results/run_2/processed/'
     items = os.listdir(data_path)
     items.sort()
@@ -34,7 +34,7 @@ def analyze_corpus(save_arrays=True, analysis_mode=False, feature_identifier='FV
     print(items)
 
     seq_length_dict = {}
-    seq_length_dict_filename = processed_path + "/sequence_lengths.json"
+    seq_length_dict_filename = processed_path + "sequence_lengths.json"
 
     seq_group_params = {}
     seq_group_params_filename = "./analysis/seq_group_params.json"
@@ -51,22 +51,10 @@ def analyze_corpus(save_arrays=True, analysis_mode=False, feature_identifier='FV
     for file in items:
         print("filename: {}".format(str(file)))
         npy_path = data_path + str(file)
-        if ("_0.") in str(file):  # only the first file in the series has a header.
-            train_array = np.load(npy_path)
-            label_array = np.load(npy_path) #label.. #TODO MAKE THIS A PROPER LABEL
-            header_names = cg_seq_df.columns.values
-            print("header names: {}".format(header_names))
-        else:
-            train_array = pd.read_csv(npy_path, names=header_names)
-            print(cg_seq_df.columns.values)
+        train_array = np.load(npy_path)
+        label_array = np.load(npy_path)
 
         #TODO: modify train_df. make that a plain old numpy array (since I need the numpy function to get a covariance matrix..)
-        print("cg_seq_df shape: {}".format(cg_seq_df.columns.values))
-        print(train_df.index, train_df.head(1))
-        label_train_df = cg_seq_df[label_list]
-        # to accommodate different feature sets, read the column names on the fly.
-        seq_group_params['train_colnames'] = train_df.columns.tolist()
-        seq_group_params['label_colnames'] = label_train_df.columns.tolist()
 
         # ------------ANALYSIS PART-----------------------------------------------------------------------------
         if analysis_mode == True:
@@ -228,5 +216,5 @@ def analyze_corpus(save_arrays=True, analysis_mode=False, feature_identifier='FV
 
 
 if __name__ == "__main__":
-    parse_scattergro(save_arrays=False, analysis_mode=True)
+    analyze_corpus(save_arrays=False, analysis_mode=True)
 

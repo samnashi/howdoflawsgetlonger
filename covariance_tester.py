@@ -5,11 +5,11 @@ import os
 from corpus_characterizer import generator_chunker
 np.set_printoptions(precision=3,suppress = True, linewidth = 150)
 
-def aggregate_data_and_label(data_array,label_array,desired_colnum = 13):
+def aggregate_data_and_label(data_array,label_array,desired_colnum = 14):
     assert(data_array.shape[0] == label_array.shape[0])
     array_relevant_vars = np.empty(shape=(data_array.shape[0], desired_colnum))
-    array_relevant_vars[:, 0:9] = data_array[:,2:]
-    array_relevant_vars[:, 9:14] = label_array[:,1:]
+    array_relevant_vars[:, 0:data_array.shape[1]] = data_array[:,:]
+    array_relevant_vars[:, desired_colnum-4:desired_colnum] = label_array[:,1:]
     return array_relevant_vars
 
 import matplotlib.pyplot as plt
@@ -38,11 +38,11 @@ import matplotlib.pyplot as plt
 #             pass
 
 #@@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-# Base_Path = "./"
-# image_path = "./images/"
-# train_path = "./train/"
-# test_path = "./test/"
-# analysis_path = "./analysis."
+Base_Path = "./"
+image_path = "./images/"
+train_path = "./train/"
+test_path = "./test/"
+analysis_path = "./analysis/"
 #^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Base_Path = "/home/devin/Documents/PITTA LID/"
 # image_path = "/home/devin/Documents/PITTA LID/img/"
@@ -50,11 +50,11 @@ import matplotlib.pyplot as plt
 # test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
 # test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
 #+++++++++++++ TO RUN ON LOCAL (IHSAN) +++++++++++++++++++++++++++++++
-Base_Path = "/home/ihsan/Documents/thesis_models/"
-image_path = "/home/ihsan/Documents/thesis_models/images"
-train_path = "/home/ihsan/Documents/thesis_models/train/"
-test_path = "/home/ihsan/Documents/thesis_models/test/"
-analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
+# Base_Path = "/home/ihsan/Documents/thesis_models/"
+# image_path = "/home/ihsan/Documents/thesis_models/images"
+# train_path = "/home/ihsan/Documents/thesis_models/train/"
+# test_path = "/home/ihsan/Documents/thesis_models/test/"
+# analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
 #%%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Base_Path = "/home/efi/Documents/thesis_models/"
 # image_path = "/home/efi/Documents/thesis_models/images"
@@ -75,7 +75,7 @@ label_filenames.sort() #sorting makes sure the label and the data are lined up.
 #print("label_filenames: {}".format(data_filenames))
 assert len(data_filenames) == len(label_filenames)
 combined_filenames = zip(data_filenames,label_filenames)
-desired_colnumber = 13
+desired_colnumber = 15
 #TODO: try with 15.
 header_corrcoef = "first 9: all but percent_damage and step_index. last four: deltaA 1-2-3-4"
 
@@ -100,16 +100,23 @@ for index_to_load in range(0,len(combined_filenames)):
     label_load_path = train_path + '/label/' + files[1]
     train_array = np.load(data_load_path)
     label_train_array = np.load(label_load_path)
+    if train_array.shape[1] > 11:
+        train_array = train_array[:,1:]
+    if label_train_array.shape[1] > 5:
+        label_train_array = label_train_array[:,1:]
     identifier = files[0][:-4]
 
     #BLOCK FOR INDIVIDUAL SEQUENCES
     relevant_vars_array = aggregate_data_and_label(data_array = train_array,
                                                    label_array=label_train_array,
                                                    desired_colnum=desired_colnumber)
-    filename_corr = analysis_path + "corrcoef_" + identifier + ".csv"
+    filename_cov = analysis_path + "cov_complete_" + identifier + ".csv"
+    filename_corr = analysis_path + "corrcoef_complete_" + identifier + ".csv"
+    np.savetxt(fname = filename_cov, X = np.cov(relevant_vars_array,rowvar=False),
+               delimiter=",",header = header_corrcoef)
     np.savetxt(fname = filename_corr, X = np.corrcoef(relevant_vars_array,rowvar=False),
                delimiter=",",header = header_corrcoef)
-    print(("corrcoef for {} saved.").format(identifier))
+    print(("corrcoef and cov for {} saved.").format(identifier))
 
 
 #

@@ -248,22 +248,22 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 
-param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
-param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
-param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
-param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
-param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
+param_dict_HLR['BatchSize'] = [128,128]
+param_dict_HLR['FeatWeight'] = [2,2]
+param_dict_HLR['GenPad'] = [128,128]
+param_dict_HLR['ConvAct']=['relu','elu']
+param_dict_HLR['DenseAct']=['relu','elu']
+param_dict_HLR['ConvBlockDepth'] = [3,3]
+param_dict_HLR['KernelReg']=[None,None]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-param_dict_HLR['id_pre'] = [] #initialize to blank first
+param_dict_HLR['id_pre'] = ['1000_mape_minmax_elu_ca_elu_da_3_cbd_l1_kr_HLR','1000_mape_minmax_relu_ca_relu_da_3_cbd_l1_kr_HLR'] #initialize to blank first
 param_dict_HLR['id_post'] = []
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
-    param_dict_HLR['id_pre'].append("HLR_" + str(z))
+    #param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_hybrid_bigdense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_mape_minmax_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -282,6 +282,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
 
 #check lengths after the idpre and idpost aren't blank anymore.
 for key in param_dict_HLR.keys():
+    print("checking: {}, length of entry is: {}".format(key,len(param_dict_HLR[key])))
     assert(len(param_dict_HLR[key]) == len(param_dict_HLR['BatchSize']))
 
 for z in range(0, len(param_dict_HLR['BatchSize'])):
@@ -299,19 +300,19 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 1200  # how many times the training corpus is sampled.
+    num_sequence_draws = 700  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
-    test_only = False  # no training. if finetune is also on, this'll raise an error.
+    test_only = True  # no training. if finetune is also on, this'll raise an error.
     use_precomp_sscaler = False
-    active_scaler_type = 'standard_minmax'
+    active_scaler_type = 'minmax'
 
     base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
         aux_circumnav_onset_draw = 450
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 1.5 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 1.0 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
     save_preds = False
@@ -423,14 +424,13 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # define the model first
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    h = Dense(64,activation=da,kernel_regularizer=kr)(g)
-    i = BatchNormalization()(h)
-    out = Dense(4)(i)
+    h = Dense(16,activation=da,kernel_regularizer=kr)(g)
+    out = Dense(4)(h)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
     optimizer_used = adam(lr=0.0025)
-    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
+    model.compile(loss='mape', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
@@ -576,17 +576,17 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label doesn't need to be 3D
             # print("file: {} data/label shape: {}, {}".format(files[0],test_array.shape, label_array.shape))
             print(files[0])
-            # print("Metrics: {}".format(model.metrics_names))
+            print("Metrics: {}".format(model.metrics_names))
             # steps per epoch is how many times that generator is called
             test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                         generator_batch_size=generator_batch_size,
                                                         use_precomputed_coeffs=use_precomp_sscaler,
                                                         scaler_type=active_scaler_type)
-            for i in range(1):
-                X_test_batch, y_test_batch = test_generator.next()
-                # print(X_test_batch)
-                # print(y_test_batch)
-                score = model.predict_on_batch(X_test_batch)
+            # for i in range(1):
+            #     X_test_batch, y_test_batch = test_generator.next()
+            #     # print(X_test_batch)
+            #     # print(y_test_batch)
+            #     score = model.predict_on_batch(X_test_batch)
                 # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
             score = model.evaluate_generator(test_generator, steps=(test_array.shape[0] // generator_batch_size),
                                              max_queue_size=test_array.shape[0], use_multiprocessing=False)
@@ -597,6 +597,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             row_dict['acc'] = score[1]  # 'acc'
             row_dict['mae'] = score[2]  # 'mean_absolute_error'
             row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+            row_dict['mse'] = score[4]
             score_rows_list.append(row_dict)
 
             # testing should start at 0. For now.
