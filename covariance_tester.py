@@ -102,16 +102,14 @@ for index_to_load in range(0,len(combined_filenames)):
     label_train_array = np.load(label_load_path)
     identifier = files[0][:-4]
 
-
-
     #BLOCK FOR INDIVIDUAL SEQUENCES
-    # relevant_vars_array = aggregate_data_and_label(data_array = train_array,
-    #                                                label_array=label_train_array,
-    #                                                desired_colnum=desired_colnumber)
-    # filename_corr = analysis_path + "corrcoef_" + identifier + ".csv"
-    # np.savetxt(fname = filename_corr, X = np.corrcoef(relevant_vars_array,rowvar=False),
-    #            delimiter=",",header = header_corrcoef)
-    # print(("corrcoef for {} saved.").format(identifier))
+    relevant_vars_array = aggregate_data_and_label(data_array = train_array,
+                                                   label_array=label_train_array,
+                                                   desired_colnum=desired_colnumber)
+    filename_corr = analysis_path + "corrcoef_" + identifier + ".csv"
+    np.savetxt(fname = filename_corr, X = np.corrcoef(relevant_vars_array,rowvar=False),
+               delimiter=",",header = header_corrcoef)
+    print(("corrcoef for {} saved.").format(identifier))
 
 
 #
