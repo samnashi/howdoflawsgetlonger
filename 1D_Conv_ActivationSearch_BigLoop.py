@@ -166,7 +166,8 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
         data_scaled = scaler.transform(X=data)
         labels_scaled = label_scaler.transform(X=labels)
-        data[:,0] = revised_step_index
+        revised_reshaped_step_index = np.reshape(revised_step_index, newshape=(data[:,0].shape[0]))
+        data[:,0] = revised_reshaped_step_index
     if use_precomputed_coeffs == False and scaler_type != "standard_minmax":
         data_scaled = scaler.fit_transform(X=data)
         labels_scaled = label_scaler.fit_transform(X=labels)
@@ -578,7 +579,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # steps per epoch is how many times that generator is called
             test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                         generator_batch_size=generator_batch_size,
-                                                        use_precomputed_coeffs=use_precomp_sscaler)
+                                                        use_precomputed_coeffs=use_precomp_sscaler,
+                                                        scaler_type=active_scaler_type)
             for i in range(1):
                 X_test_batch, y_test_batch = test_generator.next()
                 # print(X_test_batch)
