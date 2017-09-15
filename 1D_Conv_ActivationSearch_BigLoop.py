@@ -125,12 +125,16 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         elif scaler_type == 'robust':
             scaler = sklearn.preprocessing.RobustScaler()
             label_scaler = sklearn.preprocessing.MinMaxScaler()
+        if scaler_type == 'standard_minmax':
+            scaler = sklearn.preprocessing.StandardScaler()
+            scaler_step_index_only = sklearn.preprocessing.MinMaxScaler()
+            label_scaler = sklearn.preprocessing.StandardScaler()
         else:
             scaler = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
             # print("scaled: {}, scaler_type: {}".format(scaled,scaler_type))
 
-    if use_precomputed_coeffs == True:
+    if use_precomputed_coeffs == True and scaler_type=='standard':
         # lists as dummy variables first, seems like scikit flips when I pass in a list as an object attribute..
         scaler_var = [0.6925742052047087, 0.016133766659421164,
                       0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
@@ -149,7 +153,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
                                6.63076509642508e-06]
         step_index_to_fit = np.reshape(data[:, 0], newshape=(-1, 1))
         # print("the shape scikit is bitching about: {}, and after reshape: {}".format(data[:,0].shape, step_index_to_fit.shape))
-        scaler_step_index_only.fit(X=step_index_to_fit, y=None)  # gotta fit transform since \
+        revised_step_index = scaler_step_index_only.fit_transform(X=step_index_to_fit)  # gotta fit transform since \
         # TODO: /usr/local/lib/python2.7/dist-packages/sklearn/preprocessing/data.py:586: DeprecationWarning: Passing 1d arrays as data is deprecated in 0.17 and will raise ValueError in 0.19. Reshape your data either using X.reshape(-1, 1) if your data has a single feature or X.reshape(1, -1) if it contains a single sample.warnings.warn(DEPRECATION_MSG_1D, DeprecationWarning)
         # it makes no sense to precomp the stepindex. reshape is because sklearn gives a warning about 1D arrays as data..
         scaler_var.insert(0,
@@ -160,11 +164,20 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         scaler_scale.insert(0, scaler_step_index_only.scale_)
         scaler.scale_ = np.asarray(scaler_scale, dtype='float32')
         # print("data scaler mean shape: {} var shape: {} scale shape: {}".format(len(scaler.mean_),len(scaler.var_),len(scaler.scale_)))
-        data_scaled = scaler.transform(X=data, y=None)
-        labels_scaled = label_scaler.transform(X=labels, y=None)
-    if use_precomputed_coeffs == False:
-        data_scaled = scaler.fit_transform(X=data, y=None)
-        labels_scaled = label_scaler.fit_transform(X=labels, y=None)
+        data_scaled = scaler.transform(X=data)
+        labels_scaled = label_scaler.transform(X=labels)
+        data[:,0] = revised_step_index
+    if use_precomputed_coeffs == False and scaler_type != "standard_minmax":
+        data_scaled = scaler.fit_transform(X=data)
+        labels_scaled = label_scaler.fit_transform(X=labels)
+    if use_precomputed_coeffs == False and scaler_type == 'standard_minmax':
+        step_index_to_fit = np.reshape(data[:, 0], newshape=(-1, 1))
+        revised_step_index = scaler_step_index_only.fit_transform(X=step_index_to_fit)
+        data_scaled = scaler.fit_transform(X=data)
+        labels_scaled = label_scaler.fit_transform(X=labels)
+        revised_reshaped_step_index = np.reshape(revised_step_index, newshape=(data[:,0].shape[0]))
+        data[:,0] = revised_reshaped_step_index
+
         # --------i think expand dims is a lot less implicit, that's why i commented these out-------
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
@@ -233,7 +246,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
-#string format: BS +
+
 param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
 param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
@@ -249,7 +262,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_minmax_bigdense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_hybrid_bigdense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -284,12 +297,13 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 600  # how many times the training corpus is sampled.
+    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 700  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     use_precomp_sscaler = False
+    active_scaler_type = 'standard_minmax'
 
     base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
@@ -414,7 +428,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
     optimizer_used = adam(lr=0.0025)
-    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
+    model.compile(loss='mape', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
@@ -479,7 +493,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
             train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
                                                          generator_batch_size=generator_batch_size,
-                                                         use_precomputed_coeffs=use_precomp_sscaler,scaler_type='minmax')
+                                                         use_precomputed_coeffs=use_precomp_sscaler,scaler_type=active_scaler_type)
             training_hist = model.fit_generator(train_generator, epochs=num_epochs,
                                                 steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2,
                                                 callbacks=[csv_logger])
@@ -585,7 +599,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # testing should start at 0. For now.
             test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                         generator_batch_size=generator_batch_size,
-                                                        use_precomputed_coeffs=use_precomp_sscaler)
+                                                        use_precomputed_coeffs=use_precomp_sscaler,
+                                                        scaler_type=active_scaler_type)
             prediction_length = (int(1.0 * (generator_batch_size * (label_array.shape[0] // generator_batch_size))))
             test_i = 0
             # Kindly declare the shape
