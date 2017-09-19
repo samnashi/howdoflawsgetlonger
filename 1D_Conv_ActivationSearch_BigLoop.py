@@ -81,6 +81,29 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
     g = BatchNormalization()(f)
     h = Dense(feature_weighting, activation=dense_act)(g)
     return h
+
+def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
+    '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
+    b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(32, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(e)  # gives me 128x1
+    g = BatchNormalization()(f)
+    #h = Flatten()(g)
+    return g
+
+
+def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
+    '''g means it's the output of the "twice the number of parameters"  branch'''
+    b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(64, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(e)  # gives me 128x1
+    g = BatchNormalization()(f)
+    #h = Flatten()(g)
+    return g
 # ---------------------NARROW WINDOW-------------------------------------------------------------------------------------
 def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
@@ -251,10 +274,10 @@ param_dict_list = []
 param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
 param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
-param_dict_HLR['ConvAct']=['relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
-param_dict_HLR['DenseAct']=['relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
+param_dict_HLR['ConvAct']=['relu','relu','relu','relu','relu','relu','relu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
+param_dict_HLR['DenseAct']=['relu','sigmoid','tanh','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
 param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),l1_l2(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
+param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2(),l2(),l2(),l2(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
@@ -263,7 +286,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_hybrid_bigdense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_no_dense_hybrid_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -306,7 +329,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     use_precomp_sscaler = False
     active_scaler_type = 'standard_minmax'
 
-    base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.0625 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
         aux_circumnav_onset_draw = 450
@@ -395,17 +418,29 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             f11 = conv_block_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     if cbd == 3:
         if gen_pad == 128:
-            g1 = conv_block_3layers_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f2 = conv_block_3layers_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
-            g3 = conv_block_3layers_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f4 = conv_block_3layers_normal_param_count(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
-            g5 = conv_block_3layers_double_param_count(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f6 = conv_block_3layers_normal_param_count(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
-            g7 = conv_block_3layers_double_param_count(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f8 = conv_block_3layers_normal_param_count(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
-            f9 = conv_block_3layers_normal_param_count(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
-            f10 = conv_block_3layers_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
-            f11 = conv_block_3layers_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
+            # g1 = conv_block_3layers_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            # f2 = conv_block_3layers_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+            # g3 = conv_block_3layers_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            # f4 = conv_block_3layers_normal_param_count(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+            # g5 = conv_block_3layers_double_param_count(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            # f6 = conv_block_3layers_normal_param_count(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+            # g7 = conv_block_3layers_double_param_count(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            # f8 = conv_block_3layers_normal_param_count(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+            # f9 = conv_block_3layers_normal_param_count(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+            # f10 = conv_block_3layers_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+            # f11 = conv_block_3layers_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
+
+            g1 = conv_block_3layers_double_pc_flatten(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f2 = conv_block_3layers_normal_pc_flatten(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+            g3 = conv_block_3layers_double_pc_flatten(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f4 = conv_block_3layers_normal_pc_flatten(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+            g5 = conv_block_3layers_double_pc_flatten(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f6 = conv_block_3layers_normal_pc_flatten(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+            g7 = conv_block_3layers_double_pc_flatten(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f8 = conv_block_3layers_normal_pc_flatten(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+            f9 = conv_block_3layers_normal_pc_flatten(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+            f10 = conv_block_3layers_normal_pc_flatten(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+            f11 = conv_block_3layers_normal_pc_flatten(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     else:
         g1 = conv_block_double_param_count_narrow_window(input_tensor=a1, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
         f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
@@ -423,8 +458,9 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # define the model first
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    h = Dense(64,activation=da,kernel_regularizer=kr)(g)
-    i = BatchNormalization()(h)
+    #h = BatchNormalization()(g)
+    #i = Dense(64,activation=da,kernel_regularizer=kr)(h)
+    i = BatchNormalization()(g)
     out = Dense(4)(i)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
