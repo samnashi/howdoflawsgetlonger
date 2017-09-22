@@ -40,6 +40,7 @@ def set_standalone_scaler_params(output_scaler):
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''f means it's the normal param count branch'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
@@ -50,6 +51,7 @@ def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu
 
 def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None):
     '''g means it's the output of the "twice the number of parameters"  branch'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
@@ -61,6 +63,7 @@ def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu
 #add in regularizers..
 def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
@@ -73,6 +76,7 @@ def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_a
 
 def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
     '''g means it's the output of the "twice the number of parameters"  branch'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
@@ -84,6 +88,7 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
 
 def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
@@ -96,6 +101,7 @@ def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_ac
 
 def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
     '''g means it's the output of the "twice the number of parameters"  branch'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg)(c)
@@ -107,6 +113,7 @@ def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_ac
 # ---------------------NARROW WINDOW-------------------------------------------------------------------------------------
 def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',k_reg=None):
     '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
@@ -116,6 +123,7 @@ def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', d
 
 def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None):
     '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg)(c)  # gives me 128x1
@@ -137,6 +145,8 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         scaled: whether the output is scaled or not.
         scaler_type: which sklearn scaler to call
         scale_what = either the data/label (the whole array), or the yield.'''
+    if scaled==False:
+        scaler_type="None"
     if scaled == True:
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
@@ -147,17 +157,19 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
             label_scaler = sklearn.preprocessing.MinMaxScaler()
         elif scaler_type == 'robust':
             scaler = sklearn.preprocessing.RobustScaler()
-            label_scaler = sklearn.preprocessing.MinMaxScaler()
+            label_scaler = sklearn.preprocessing.RobustScaler()
         if scaler_type == 'standard_minmax':
             scaler = sklearn.preprocessing.StandardScaler()
             scaler_step_index_only = sklearn.preprocessing.MinMaxScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
+        if scaler_type == 'minmax_labels_only':
+            label_scaler = sklearn.preprocessing.MinMaxScaler
         else:
             scaler = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
             # print("scaled: {}, scaler_type: {}".format(scaled,scaler_type))
 
-    if use_precomputed_coeffs == True and scaler_type=='standard':
+    if scaled==True and use_precomputed_coeffs == True and scaler_type=='standard':
         # lists as dummy variables first, seems like scikit flips when I pass in a list as an object attribute..
         scaler_var = [0.6925742052047087, 0.016133766659421164,
                       0.6923827778657753, 0.019533317182529104, 3.621591547512037, 0.03208850741829512,
@@ -191,22 +203,28 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         labels_scaled = label_scaler.transform(X=labels)
         revised_reshaped_step_index = np.reshape(revised_step_index, newshape=(data[:,0].shape[0]))
         data[:,0] = revised_reshaped_step_index
-    if use_precomputed_coeffs == False and scaler_type != "standard_minmax":
+    if use_precomputed_coeffs == False and scaler_type != "standard_minmax" and scaled==True:
         data_scaled = scaler.fit_transform(X=data)
         labels_scaled = label_scaler.fit_transform(X=labels)
-    if use_precomputed_coeffs == False and scaler_type == 'standard_minmax':
+    if use_precomputed_coeffs == False and scaler_type == 'standard_minmax' and scaled==True:
         step_index_to_fit = np.reshape(data[:, 0], newshape=(-1, 1))
         revised_step_index = scaler_step_index_only.fit_transform(X=step_index_to_fit)
         data_scaled = scaler.fit_transform(X=data)
         labels_scaled = label_scaler.fit_transform(X=labels)
         revised_reshaped_step_index = np.reshape(revised_step_index, newshape=(data[:,0].shape[0]))
         data[:,0] = revised_reshaped_step_index
+    if use_precomputed_coeffs == False and scaler_type == "minmax_labels_only":
+        data_scaled = data
+        labels_scaled = label_scaler.fit(X=labels)
 
         # --------i think expand dims is a lot less implicit, that's why i commented these out-------
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
+    if scaled==False:
+        data_scaled = data
+        labels_scaled = labels
 
     data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the 0th axis.
     labels_scaled = np.expand_dims(labels_scaled, axis=0)
@@ -275,9 +293,9 @@ param_dict_HLR['BatchSize'] = [128,128,128,128,128,128,128,128,128,128,128,128,1
 param_dict_HLR['FeatWeight'] = [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
 param_dict_HLR['GenPad'] = [128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128]
 param_dict_HLR['ConvAct']=['relu','relu','relu','relu','relu','relu','relu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu','relu','elu','selu','relu','relu','elu','elu']
-param_dict_HLR['DenseAct']=['relu','sigmoid','tanh','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
+param_dict_HLR['DenseAct']=['sigmoid','sigmoid','sigmoid','tanh','tanh','tanh','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh','relu','elu','selu','sigmoid','tanh','sigmoid','tanh']
 param_dict_HLR['ConvBlockDepth'] = [3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2(),l2(),l2(),l2(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
+param_dict_HLR['KernelReg']=[l1_l2(),l1(),l2(),l1_l2(),l1(),l2(),l2(),None,None,None,None,None,None,None,l1(),l1(),l1(),l1(),l1(),l1(),l1(),None,None,None,None,None,None,None]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
@@ -286,7 +304,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_no_dense_hybrid_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_noscaler_bninput_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -326,8 +344,11 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
+    scaler_active = False
     use_precomp_sscaler = False
-    active_scaler_type = 'standard_minmax'
+    active_scaler_type = "None"
+    if active_scaler_type != "None":
+        assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
     base_seq_circumnav_amt = 0.0625 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
@@ -458,10 +479,10 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # define the model first
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
-    #h = BatchNormalization()(g)
-    #i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    i = BatchNormalization()(g)
-    out = Dense(4)(i)
+    h = BatchNormalization()(g)
+    i = Dense(64,activation=da,kernel_regularizer=kr)(h)
+    j = BatchNormalization()(i)
+    out = Dense(4)(j)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
@@ -531,9 +552,10 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
             train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
                                                          generator_batch_size=generator_batch_size,
-                                                         use_precomputed_coeffs=use_precomp_sscaler,scaler_type=active_scaler_type)
-            training_hist = model.fit_generator(train_generator, epochs=num_epochs,
-                                                steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size), verbose=2,
+                                                         use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
+                                                         scaler_type=active_scaler_type)
+            training_hist = model.fit_generator(train_generator, steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size),
+                                                epochs=num_epochs, verbose=2,
                                                 callbacks=[csv_logger])
 
         if weights_present_indicator == True and finetune == True:
@@ -616,7 +638,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # steps per epoch is how many times that generator is called
             test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                         generator_batch_size=generator_batch_size,
-                                                        use_precomputed_coeffs=use_precomp_sscaler,
+                                                        use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                         scaler_type=active_scaler_type)
             for i in range(1):
                 X_test_batch, y_test_batch = test_generator.next()
@@ -638,7 +660,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # testing should start at 0. For now.
             test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                         generator_batch_size=generator_batch_size,
-                                                        use_precomputed_coeffs=use_precomp_sscaler,
+                                                        use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                         scaler_type=active_scaler_type)
             prediction_length = (int(1.0 * (generator_batch_size * (label_array.shape[0] // generator_batch_size))))
             test_i = 0
