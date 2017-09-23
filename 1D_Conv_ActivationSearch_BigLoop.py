@@ -142,12 +142,15 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         start_at: configures where in the arrays do the generator start yielding (to ensure an LSTM doesn't always start at the same place
         generator_batch_size: how many "rows" of the numpy array does the generator yield each time
         scaled: whether the output is scaled or not.
-        scaler_type: which sklearn scaler to call
+        scaler_type: which sklearn scaler to call.
+        - standard_per_batch is similar to what a batchnorm layer would do.
+        - standard_minmax uses standardscaler on the data, and minmax on the stepindex
+        - minmax_labels_only applies minmax only on the labels (the data scaling is done by a batchnorm layer after the input layer)
         scale_what = either the data/label (the whole array), or the yield.'''
     if scaled==False:
         scaler_type="None"
     if scaled == True:
-        if scaler_type == 'standard':
+        if scaler_type == 'standard' or scaler_type == "standard_per_batch":
             scaler = sklearn.preprocessing.StandardScaler()
             scaler_step_index_only = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
@@ -157,11 +160,11 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         elif scaler_type == 'robust':
             scaler = sklearn.preprocessing.RobustScaler()
             label_scaler = sklearn.preprocessing.RobustScaler()
-        if scaler_type == 'standard_minmax':
+        elif scaler_type == 'standard_minmax':
             scaler = sklearn.preprocessing.StandardScaler()
             scaler_step_index_only = sklearn.preprocessing.MinMaxScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
-        if scaler_type == 'minmax_labels_only':
+        elif scaler_type == 'minmax_labels_only':
             label_scaler = sklearn.preprocessing.MinMaxScaler
         else:
             scaler = sklearn.preprocessing.StandardScaler()
@@ -221,7 +224,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-    if scaled==False:
+    if scaled == False or scaler_type == "standard_per_batch":
         data_scaled = data
         labels_scaled = labels
 
@@ -283,7 +286,22 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (x10.shape[1] == generator_batch_size_valid_x10)
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
-        yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
+        if scaler_type == "standard_per_batch":
+            x1s = scaler.fit_transform(X=x1)
+            x2s = scaler.fit_transform(X=x2)
+            x3s = scaler.fit_transform(X=x3)
+            x4s = scaler.fit_transform(X=x4)
+            x5s = scaler.fit_transform(X=x5)
+            x6s = scaler.fit_transform(X=x6)
+            x7s = scaler.fit_transform(X=x7)
+            x8s = scaler.fit_transform(X=x8)
+            x9s = scaler.fit_transform(X=x9)
+            x10s = scaler.fit_transform(X=x10)
+            x11s = scaler.fit_transform(X=x11)
+            ys = scaler.fit_transform(X=y) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
+            yield ([x1s, x2s, x3s, x4s, x5s, x6s, x7s, x8s, x9s, x10s, x11s], ys)
+        else:
+            yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
@@ -303,7 +321,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_rmsprop_nofw_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_robustscaler_rmsprop_nofw_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -345,7 +363,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
     use_precomp_sscaler = False
-    active_scaler_type = "standard" #no capitals!
+    active_scaler_type = "robust" #no capitals!
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
