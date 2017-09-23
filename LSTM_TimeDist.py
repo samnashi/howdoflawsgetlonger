@@ -103,14 +103,14 @@ num_epochs = 1 #individual. like how many times is the net trained on that seque
 num_sequence_draws = 1 #how many times the training corpus is sampled.
 generator_batch_size = 256
 finetune = False
-test_only = True #no training. if finetune is also on, this'll raise an error.
+test_only = False #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
 sequence_circumnavigation_amt = 2
-save_preds = False
+save_preds = True
 save_figs = False
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #identifier_finetune = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
-identifier_pre_training = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
+identifier_pre_training = '_dryrun_debug_' #weights to initialize with, if fine tuning is on.
 identifier_post_training = "dryrun" #weight name to save as
 Base_Path = "./"
 train_path = "/home/ihsan/Documents/thesis_models/train/"
@@ -238,6 +238,7 @@ if weights_file_name is not None:
                                                                                         test_weights_present_indicator))
         weights_to_test_with_fname = weights_file_name
         model.load_weights(weights_to_test_with_fname, by_name=True)
+
 if test_only == True:
     weights_to_test_with_fname = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
     weights_file_name = weights_to_test_with_fname  # piggybacking the old flag. the one without fname is to refer to post training weights.
@@ -248,8 +249,11 @@ if weights_file_name == None:
         "Warning: check input flags. No training has been done, and testing is about to be performed with weights labeled as POST TRAINING weights")
     test_weights_present_indicator = os.path.isfile(
         'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
+    #test_weights_present_indicator = True
 print("weights_file_name after the if/else block to determine the test flag is: {}".format(weights_file_name))
-if weights_present_indicator == True: #TODO: finetune related options here.
+print("test_weights_indicator is: {}".format(test_weights_present_indicator))
+
+if test_weights_present_indicator == True:
     #the testing part
     print("TESTING PHASE, with weights: {}".format('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'))
     #print("TESTING PHASE, with weights {}".format('Weights_300_3_firstrun_fv1b_server'))

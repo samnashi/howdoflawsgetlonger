@@ -41,7 +41,7 @@ def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scale
         else:
             scaler = sklearn.preprocessing.StandardScaler()
         print("scaled: {}, scaler_type: {}".format(scaled, scaler_type))
-    while 1:
+   # while 1:
 
 def np_array_pair_generator(data,labels,start_at=0,generator_batch_size=64,scaled=True,scaler_type = 'standard',scale_what = 'data'): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
