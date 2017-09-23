@@ -7,6 +7,7 @@ from keras.utils import plot_model
 from keras.layers import Dense, LSTM, GRU, Flatten, Input, Reshape, TimeDistributed, Bidirectional, BatchNormalization
 from keras.initializers import lecun_normal,glorot_normal
 from keras.optimizers import rmsprop
+from keras.regularizers import l1,l1_l2,l2
 from keras import metrics
 import pandas as pd
 import scipy.io as sio
@@ -23,7 +24,6 @@ from keras.callbacks import CSVLogger
 
 #you limit the # of calls keras calls the generator OUTSIDE the generator.
 #each time you fit, dataset length // batch size. round down!
-#TODO: add "use_precomputed_scaler_coeffs = False)
 def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data',use_precomputed_coeffs = False): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
@@ -37,11 +37,13 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         if scaler_type == 'standard':
             scaler = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
-            print('Standard Scaler initialized \n')
+            #print('Standard Scaler initialized \n')
         elif scaler_type == 'minmax':
             scaler = sklearn.preprocessing.MinMaxScaler()
+            label_scaler = sklearn.preprocessing.MinMaxScaler()
         elif scaler_type == 'robust':
             scaler = sklearn.preprocessing.RobustScaler()
+            label_scaler = sklearn.preprocessing.RobustScaler()
         else:
             scaler = sklearn.preprocessing.StandardScaler() #TRY NORMALIZER FOR THE LABEL
         #print("scaled: {}, scaler_type: {}".format(scaled, scaler_type))\
@@ -56,14 +58,18 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
             label_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11, 4.3967045763969097e-11]
             label_scaler.mean_ = [4.5771139469142714e-06, 4.9590312890501306e-06, 6.916592701282579e-06, 6.9171280743598655e-06]
             label_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
-            data_scaled = scaler.transform(X=data,y=None)
-            labels_scaled = label_scaler.transform(X=labels,y=None)
+            data_scaled = scaler.transform(X=data)
+            labels_scaled = label_scaler.transform(X=labels)
         if use_precomputed_coeffs == False:
-            data_scaled = scaler.fit_transform(X=data, y=None)
-            labels_scaled = scaler.fit_transform(X=labels, y=None) #i don't think you should scale the labels..
+            data_scaled = scaler.fit_transform(X=data)
+            labels_scaled = scaler.fit_transform(X=labels) #i don't think you should scale the labels..
         #labels_scaled = labels
         # data_scaled = np.reshape(data_scaled,(1,data_scaled.shape[0],data_scaled.shape[1]))
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
+
+        if data_scaled.shape[1] != 11: #TODO properly investigate why some data arrays have 12 columns..
+            data_scaled = data_scaled[:, 1:]
+
         data_scaled = np.expand_dims(data_scaled, axis=0)  # add 1 dimension in the 0th axis
         labels_scaled = np.expand_dims(labels_scaled, axis=0)
         index = start_at
@@ -99,25 +105,43 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-num_epochs = 1 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 1 #how many times the training corpus is sampled.
-generator_batch_size = 256
+num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
+num_sequence_draws = 1200 #how many times the training corpus is sampled.
+generator_batch_size = 128
 finetune = False
 test_only = False #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
-sequence_circumnavigation_amt = 2
+sequence_circumnavigation_amt = 0.75
 save_preds = True
 save_figs = False
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#identifier_finetune = '_3c_elu_longtrain_256bat_fv1b_' #weights to initialize with, if fine tuning is on.
-identifier_pre_training = '_dryrun_debug_' #weights to initialize with, if fine tuning is on.
-identifier_post_training = "dryrun" #weight name to save as
+identifier_pre_training = '_small_' #weights to initialize with, if fine tuning is on.
+identifier_post_training = "_small_l1_" #weight name to save as
+# @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
-train_path = "/home/ihsan/Documents/thesis_models/train/"
-test_path = "/home/ihsan/Documents/thesis_models/test/"
-#seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
-#11 input columns
-#4 output columns.
+image_path = "./images/"
+train_path = "./train/"
+test_path = "./test/"
+analysis_path = "./analysis."
+# ^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Base_Path = "/home/devin/Documents/PITTA LID/"
+# image_path = "/home/devin/Documents/PITTA LID/img/"
+# train_path = "/home/devin/Documents/PITTA LID/Train FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/Test FV1b/"
+# test_path = "/home/devin/Documents/PITTA LID/FV1b 1d nonlinear/"
+# +++++++++++++ TO RUN ON LOCAL (IHSAN) +++++++++++++++++++++++++++++++
+# Base_Path = "/home/ihsan/Documents/thesis_models/"
+# image_path = "/home/ihsan/Documents/thesis_models/images"
+# train_path = "/home/ihsan/Documents/thesis_models/train/"
+# test_path = "/home/ihsan/Documents/thesis_models/test/"
+# analysis_path = "/home/ihsan/Documents/thesis_models/analysis/"
+# %%%%%%%%%%%%% TO RUN ON LOCAL (EFI) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Base_Path = "/home/efi/Documents/thesis_models/"
+# image_path = "/home/efi/Documents/thesis_models/images"
+# train_path = "/home/efi/Documents/thesis_models/train/"
+# test_path = "/home/efi/Documents/thesis_models/test/"
+# analysis_path = "home/efi/Documents/thesis_models/analysis"
+# seq_length_dict_filename = train_path + "/data/seq_length_dict.json"
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 np.random.seed(1337)
 #load data multiple times.
@@ -140,11 +164,11 @@ print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 #TODO boolean flags for retraining
 #TODO: check if model runs just fine with the batch norm layers
 a = Input(shape=(None,11))
-b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(a)
+b = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1()))(a)
 b = BatchNormalization(name='bn_between_lstm')(b) #TODO: try all batchnorm on and fastmath is false
-c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(b)
+c = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1()))(b)
 c = BatchNormalization(name='bn_after_last_lstm')(c)
-d = TimeDistributed(Dense(64,activation='elu',kernel_initializer=lecun_normal(seed=1337)))(c)
+d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=l1()))(c)
 d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
@@ -196,7 +220,7 @@ if (finetune == False and weights_present_indicator == False and test_only == Fa
             model.load_weights(finetune_init_weights_filename, by_name=True)
 
         train_generator = pair_generator_lstm(train_array, label_array, start_at=shuffled_starting_position,
-                            generator_batch_size=generator_batch_size, use_precomputed_coeffs=True)
+                            generator_batch_size=generator_batch_size, use_precomputed_coeffs=False)
 
         if i == 0 :
             training_hist = model.fit_generator(train_generator,epochs=num_epochs,

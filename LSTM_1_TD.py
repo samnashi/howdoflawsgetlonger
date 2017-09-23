@@ -111,8 +111,8 @@ print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 
 #define the model first
 a = Input(shape=(None,11))
-b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(a)
-c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(b)
+b = Bidirectional(LSTM(100,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(a)
+c = Bidirectional(LSTM(100,kernel_initializer=lecun_normal(seed=1337),return_sequences=True))(b)
 d = TimeDistributed(Dense(64,kernel_initializer=lecun_normal(seed=1337)))(c)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
