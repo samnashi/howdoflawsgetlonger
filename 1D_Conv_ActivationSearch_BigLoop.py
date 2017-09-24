@@ -224,7 +224,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-    if scaled == False or scaler_type == "standard_per_batch":
+    if not scaled or scaler_type == "standard_per_batch":
         data_scaled = data
         labels_scaled = labels
 
@@ -287,19 +287,20 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
         if scaler_type == "standard_per_batch":
-            x1s = scaler.fit_transform(X=x1)
-            x2s = scaler.fit_transform(X=x2)
-            x3s = scaler.fit_transform(X=x3)
-            x4s = scaler.fit_transform(X=x4)
-            x5s = scaler.fit_transform(X=x5)
-            x6s = scaler.fit_transform(X=x6)
-            x7s = scaler.fit_transform(X=x7)
-            x8s = scaler.fit_transform(X=x8)
-            x9s = scaler.fit_transform(X=x9)
-            x10s = scaler.fit_transform(X=x10)
-            x11s = scaler.fit_transform(X=x11)
-            ys = scaler.fit_transform(X=y) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
-            yield ([x1s, x2s, x3s, x4s, x5s, x6s, x7s, x8s, x9s, x10s, x11s], ys)
+            # x1s = scaler.fit_transform(X=x1)
+            # x2s = scaler.fit_transform(X=x2)
+            # x3s = scaler.fit_transform(X=x3)
+            # x4s = scaler.fit_transform(X=x4)
+            # x5s = scaler.fit_transform(X=x5)
+            # x6s = scaler.fit_transform(X=x6)
+            # x7s = scaler.fit_transform(X=x7)
+            # x8s = scaler.fit_transform(X=x8)
+            # x9s = scaler.fit_transform(X=x9)
+            # x10s = scaler.fit_transform(X=x10)
+            # x11s = scaler.fit_transform(X=x11)
+            ys = label_scaler.fit_transform(X=np.reshape(y,newshape=(y.shape[1],y.shape[2]))) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
+            y_re_exp = np.reshape(ys,newshape = (y.shape))
+            yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y_re_exp)
         else:
             yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
@@ -363,7 +364,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
     use_precomp_sscaler = False
-    active_scaler_type = "robust" #no capitals!
+    active_scaler_type = "standard_per_batch" #no capitals!
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
