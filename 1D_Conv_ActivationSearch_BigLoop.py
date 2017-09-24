@@ -85,9 +85,9 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
     h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
     return h
 
-def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
+def conv_block_3layers_normalpc_bninput_nodense(input_tensor, conv_act='relu', dense_act='relu', k_reg=None, k_init='lecun_normal'):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
-    #input_tensor = BatchNormalization()(input_tensor)
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
@@ -98,9 +98,9 @@ def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_ac
     return g
 
 
-def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
+def conv_block_3layers_doublepc_bninput_nodense(input_tensor, conv_act='relu', dense_act='relu', feature_weighting=2, k_reg=None, k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
-    #input_tensor = BatchNormalization()(input_tensor)
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
@@ -469,17 +469,17 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # f10 = conv_block_3layers_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
             # f11 = conv_block_3layers_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
 
-            g1 = conv_block_3layers_double_pc_flatten(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f2 = conv_block_3layers_normal_pc_flatten(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
-            g3 = conv_block_3layers_double_pc_flatten(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f4 = conv_block_3layers_normal_pc_flatten(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
-            g5 = conv_block_3layers_double_pc_flatten(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f6 = conv_block_3layers_normal_pc_flatten(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
-            g7 = conv_block_3layers_double_pc_flatten(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
-            f8 = conv_block_3layers_normal_pc_flatten(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
-            f9 = conv_block_3layers_normal_pc_flatten(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
-            f10 = conv_block_3layers_normal_pc_flatten(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
-            f11 = conv_block_3layers_normal_pc_flatten(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
+            g1 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a1, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
+            f2 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a2, k_reg=kr, conv_act=ca, dense_act=da)
+            g3 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a3, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
+            f4 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a4, k_reg=kr, conv_act=ca, dense_act=da)
+            g5 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a5, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
+            f6 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a6, k_reg=kr, conv_act=ca, dense_act=da)
+            g7 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a7, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
+            f8 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a8, k_reg=kr, conv_act=ca, dense_act=da)
+            f9 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a9, k_reg=kr, conv_act=ca, dense_act=da)
+            f10 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a10, k_reg=kr, conv_act=ca, dense_act=da)
+            f11 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a11, k_reg=kr, conv_act=ca, dense_act=da)
     else:
         g1 = conv_block_double_param_count_narrow_window(input_tensor=a1, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
         f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
