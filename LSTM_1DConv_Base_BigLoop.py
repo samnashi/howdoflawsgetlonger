@@ -120,7 +120,7 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
 
 def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
-    #input_tensor = BatchNormalization()(input_tensor)
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
@@ -133,7 +133,7 @@ def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_ac
 
 def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
-    #input_tensor = BatchNormalization()(input_tensor)
+    input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
@@ -257,7 +257,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-    if scaled == False or scaler_type == "standard_per_batch":
+    if not scaled or scaler_type == "standard_per_batch":
         data_scaled = data
         labels_scaled = labels
 
@@ -320,19 +320,20 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
         if scaler_type == "standard_per_batch":
-            x1s = scaler.fit_transform(X=x1)
-            x2s = scaler.fit_transform(X=x2)
-            x3s = scaler.fit_transform(X=x3)
-            x4s = scaler.fit_transform(X=x4)
-            x5s = scaler.fit_transform(X=x5)
-            x6s = scaler.fit_transform(X=x6)
-            x7s = scaler.fit_transform(X=x7)
-            x8s = scaler.fit_transform(X=x8)
-            x9s = scaler.fit_transform(X=x9)
-            x10s = scaler.fit_transform(X=x10)
-            x11s = scaler.fit_transform(X=x11)
-            ys = scaler.fit_transform(X=y) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
-            yield ([x1s, x2s, x3s, x4s, x5s, x6s, x7s, x8s, x9s, x10s, x11s], ys)
+            # x1s = scaler.fit_transform(X=x1)
+            # x2s = scaler.fit_transform(X=x2)
+            # x3s = scaler.fit_transform(X=x3)
+            # x4s = scaler.fit_transform(X=x4)
+            # x5s = scaler.fit_transform(X=x5)
+            # x6s = scaler.fit_transform(X=x6)
+            # x7s = scaler.fit_transform(X=x7)
+            # x8s = scaler.fit_transform(X=x8)
+            # x9s = scaler.fit_transform(X=x9)
+            # x10s = scaler.fit_transform(X=x10)
+            # x11s = scaler.fit_transform(X=x11)
+            ys = label_scaler.fit_transform(X=np.reshape(y,newshape=(y.shape[1],y.shape[2]))) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
+            y_re_exp = np.reshape(ys,newshape = (y.shape))
+            yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y_re_exp)
         else:
             yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
@@ -354,7 +355,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_convlstm_big_ssbatch_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_convlstm_ssbatch_bn_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -400,7 +401,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-    base_seq_circumnav_amt = 0.125 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.25 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
         aux_circumnav_onset_draw = 450
@@ -531,7 +532,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     g = concatenate(tensors_to_concat)
     h = BatchNormalization()(g)
     # i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    i = reference_bilstm_big(k_reg=kr,rec_reg=kr)(h)
+    i = reference_bilstm_small(input_tensor = h, k_reg=kr,rec_reg=kr)
     j = BatchNormalization()(i)
     out = Dense(4)(j)
 
