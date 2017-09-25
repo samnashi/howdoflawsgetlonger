@@ -49,8 +49,9 @@ def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(
     j = BatchNormalization()(j)
     k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation='sigmoid',
                               kernel_regularizer=k_reg))(j)
-    l = BatchNormalization()(k)
-    out = Dense(4)(l)
+    #l = BatchNormalization()(k)
+    #out = Dense(4)(l)
+    out = k
     return out
 
 def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1(),rec_reg=l1(), sf = False,imp = 2):
@@ -66,8 +67,9 @@ def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1()
     j = BatchNormalization()(j)
     k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation='sigmoid',
                               kernel_regularizer=k_reg))(j)
-    l = BatchNormalization()(k)
-    out = Dense(4)(l)
+    # l = BatchNormalization()(k)
+    # out = Dense(4)(l)
+    out = k
     return out
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
@@ -340,14 +342,14 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 
-param_dict_HLR['BatchSize'] = [256,256,256]
+param_dict_HLR['BatchSize'] = [128,128,128]
 param_dict_HLR['FeatWeight'] = [2,2,2]
+#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['GenPad'] = [128,128,128]
 param_dict_HLR['ConvAct']=['relu','relu','relu']
 param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
 param_dict_HLR['KernelReg']=[l1_l2(),l1(),l2()]
 param_dict_HLR['ConvBlockDepth'] = [3,3,3]
-#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
@@ -355,7 +357,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_convlstm_ssbatch_bn_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -390,8 +392,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 1200  # how many times the training corpus is sampled.
+    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 800  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -401,12 +403,12 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-    base_seq_circumnav_amt = 0.25 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
         aux_circumnav_onset_draw = 450
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 0.5 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 0.65 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
     save_preds = False
@@ -533,13 +535,13 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     h = BatchNormalization()(g)
     # i = Dense(64,activation=da,kernel_regularizer=kr)(h)
     i = reference_bilstm_small(input_tensor = h, k_reg=kr,rec_reg=kr)
-    j = BatchNormalization()(i)
-    out = Dense(4)(j)
+    #j = BatchNormalization()(i)
+    out = Dense(4)(i)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
-    plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
+    plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
     optimizer_used = rmsprop()
-    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
+    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))

@@ -25,7 +25,7 @@ import sklearn.preprocessing
 #     conv_block_normal_param_count_narrow_window, conv_block_double_param_count_narrow_window,\
 #     conv_block_double_param_count_narrow_window_causal, conv_block_normal_param_count_narrow_window_causal, reference_bilstm
 
-# np.set_printoptions(threshold='nan')
+np.set_printoptions(threshold=int('nan'))
 
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.currently set to 1d.'''
@@ -322,7 +322,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_stdperbatch_rmsp_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_stdperbatch_rmsp_nofinalbn_msle_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -358,7 +358,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 1200  # how many times the training corpus is sampled.
+    num_sequence_draws = 700  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -368,12 +368,12 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-    base_seq_circumnav_amt = 0.25 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
-        aux_circumnav_onset_draw = 450
+        aux_circumnav_onset_draw = 600
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 1.0 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
     save_preds = False
@@ -499,13 +499,13 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     g = concatenate(tensors_to_concat)
     h = BatchNormalization()(g)
     i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    j = BatchNormalization()(i)
-    out = Dense(4)(j)
+    #j = BatchNormalization()(i)
+    out = Dense(4)(i)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
-    plot_model(model, to_file=analysis_path + 'model_' + identifier_pre_training + '.png', show_shapes=True)
+    plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
     optimizer_used = rmsprop()
-    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
+    model.compile(loss='msle', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
