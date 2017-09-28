@@ -1,7 +1,8 @@
 from corpus_characterizer import generator_chunker
 import numpy as np
 import os
-from sklearn.metrics import mean_squared_error,mean_absolute_error, median_absolute_error, mean_squared_log_error, explained_variance_score, r2_score
+#from sklearn.metrics import mean_squared_error,mean_absolute_error, median_absolute_error, mean_squared_log_error, explained_variance_score, r2_score
+from sklearn.metrics import mean_squared_error,mean_absolute_error, median_absolute_error, explained_variance_score, r2_score
 
 #@@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
@@ -9,9 +10,10 @@ image_path = "./images/"
 train_path = "./train/"
 test_path = "./test/"
 analysis_path = "./analysis/"
+chunker_path = analysis_path + "chunker/"
 
 #---------part from covariance tester---------------
-
+save_array = True
 CHUNKER_BATCH_SIZE = 128
 #load data multiple times.
 data_filenames = os.listdir(train_path + "data")
@@ -138,12 +140,12 @@ for index_to_load in range(0,2):
         mae_average_list.append(mae_average)
         
         #MSLE
-        msle_at_instance = mean_squared_log_error(y_true=chunk_label,y_pred=chunk_data)
-        msle_at_instance_list.append(msle_at_instance)
-        msle_cumulative = msle_cumulative + msle_at_instance
-        msle_cumulative_list.append(msle_cumulative)
-        msle_average = msle_cumulative/counter
-        msle_average_list.append(msle_average)
+        # msle_at_instance = mean_squared_log_error(y_true=chunk_label,y_pred=chunk_data)
+        # msle_at_instance_list.append(msle_at_instance)
+        # msle_cumulative = msle_cumulative + msle_at_instance
+        # msle_cumulative_list.append(msle_cumulative)
+        # msle_average = msle_cumulative/counter
+        # msle_average_list.append(msle_average)
         
         #R2
         r2_at_instance = r2_score(y_true=chunk_label,y_pred=chunk_data)
@@ -172,27 +174,78 @@ for index_to_load in range(0,2):
         print("remaining: {}".format(remaining))
         remaining = remaining - CHUNKER_BATCH_SIZE
         #print("data chunk 2: {}".format(chunker_proto_data.next()))
-        
+
+    aggregate_list=[] #saves the aggregated array in a list so the filename saving can be automated
+    aggregate_name_list=[] #since trying to directly access variable names isn't a good idea in python...
         #MSE MAE MSLE R2 EVS MED_AE
     print("mse_cumulative: {}".format(mse_cumulative_list))
     print("mse_average: {}".format(mse_average_list))
     print("mse_at_instance: {}".format(mse_at_instance_list))
+    assert(len(mse_cumulative_list)==len(mse_average_list)==len(mse_at_instance_list))
+    aggregate_mse = np.empty(shape=(len(mse_cumulative_list),3))
+    #ORDER IS cumulative - average - at instance
+    aggregate_mse[:, 0] = np.asarray(mse_cumulative_list)
+    aggregate_mse[:, 1] = np.asarray(mse_average_list)
+    aggregate_mse[:, 2] = np.asarray(mse_at_instance_list)
+    aggregate_list.append(aggregate_mse)
+    aggregate_name_list.append('mse_agg')
 
     print("mae_cumulative: {}".format(mae_cumulative_list))
     print("mae_average: {}".format(mae_average_list))
     print("mae_at_instance: {}".format(mae_at_instance_list))
+    assert(len(mae_cumulative_list)==len(mae_average_list)==len(mae_at_instance_list))
+    aggregate_mae = np.empty(shape=(len(mae_cumulative_list),3))
+    #ORDER IS cumulative - average - at instance
+    aggregate_mae[:, 0] = np.asarray(mae_cumulative_list)
+    aggregate_mae[:, 1] = np.asarray(mae_average_list)
+    aggregate_mae[:, 2] = np.asarray(mae_at_instance_list)
+    aggregate_list.append(aggregate_mae)
+    aggregate_name_list.append('mae_agg')
+
     
-    print("msle_cumulative: {}".format(msle_cumulative_list))
-    print("msle_average: {}".format(msle_average_list))
-    print("msle_at_instance: {}".format(msle_at_instance_list))
+    # print("msle_cumulative: {}".format(msle_cumulative_list))
+    # print("msle_average: {}".format(msle_average_list))
+    # print("msle_at_instance: {}".format(msle_at_instance_list))
+    # assert(len(msle_cumulative_list)==len(msle_average_list)==len(msle_at_instance_list))
+    # aggregate_msle = np.empty(shape=(len(msle_cumulative_list),3))
+    # #ORDER IS cumulative - average - at instance
+    # aggregate_msle[:, 0] = np.asarray(msle_cumulative_list)
+    # aggregate_msle[:, 1] = np.asarray(msle_average_list)
+    # aggregate_msle[:, 2] = np.asarray(msle_at_instance_list)
+    # aggregate_list.append(aggregate_msle)
+    # aggregate_name_list.append("msle")
     
     print("r2_cumulative: {}".format(r2_cumulative_list))
     print("r2_average: {}".format(r2_average_list))
     print("r2_at_instance: {}".format(r2_at_instance_list))
+    assert(len(r2_cumulative_list)==len(r2_average_list)==len(r2_at_instance_list))
+    aggregate_r2 = np.empty(shape=(len(r2_cumulative_list),3))
+    #ORDER IS cumulative - average - at instance
+    aggregate_r2[:, 0] = np.asarray(r2_cumulative_list)
+    aggregate_r2[:, 1] = np.asarray(r2_average_list)
+    aggregate_r2[:, 2] = np.asarray(r2_at_instance_list)
+    aggregate_list.append(aggregate_r2)
+    aggregate_name_list.append('r2_agg')
     
     print("evs_cumulative: {}".format(evs_cumulative_list))
     print("evs_average: {}".format(evs_average_list))
     print("evs_at_instance: {}".format(evs_at_instance_list))
+    assert(len(evs_cumulative_list)==len(evs_average_list)==len(evs_at_instance_list))
+    aggregate_evs = np.empty(shape=(len(evs_cumulative_list),3))
+    #ORDER IS cumulative - average - at instance
+    aggregate_evs[:, 0] = np.asarray(evs_cumulative_list) #cumulative.
+    aggregate_evs[:, 1] = np.asarray(evs_average_list)
+    aggregate_evs[:, 2] = np.asarray(evs_at_instance_list)
+    aggregate_list.append(aggregate_evs)
+    aggregate_name_list.append('evs_agg')
+
+    if save_array == True:
+        for index in range(0,len(aggregate_list)):
+            #get the index of the array in the list of names (the second list)
+            arrayname = aggregate_name_list[index]
+            np.savetxt(fname=chunker_path + arrayname + "_" + str(identifier) + ".csv",delimiter=',',
+                       X=aggregate_list[index],header="cumulative(sum)-average-instance")
+
 
     #TODO: aggregate and save as a numpy array or a csv.
 

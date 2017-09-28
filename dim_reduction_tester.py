@@ -75,13 +75,35 @@ for index_to_load in range(0,1):
     train_array=train_array[-10000:,:] #cut it short just to test
 
     #KernelPCA, FastICA, FactorAnalysis, IncrementalPCA
-    # train_embedded = TSNE(n_components=2).fit_transform(train_array)
-    #train_embedded = TruncatedSVD(n_components=2).fit_transform(train_array)
-    #train_embedded = PCA(n_components=3).fit_transform(train_array)
-    train_embedded = KernelPCA(n_components=4).fit_transform(train_array)
-    #train_embedded = FastICA(n_components=2).fit_transform(train_array)
-    #train_embedded = FactorAnalysis(n_components=2).fit_transform(train_array)
-    #train_embedded = IncrementalPCA(n_components=2).fit_transform(train_array)
+
+    #tsne = TSNE(n_components=2)
+    # train_embedded = tsne.fit_transform(train_array)
+
+    # tsvd = TruncatedSVD(n_components=2)
+    # train_embedded = tsvd.fit_transform(train_array)
+
+    pca = PCA(n_components=3)
+    #train_embedded = pca.fit_transform(train_array)
+
+    kpca = KernelPCA(n_components=3)
+    train_embedded = kpca.fit_transform(train_array)
+
+    fica = FastICA(n_components=2)
+    #train_embedded = fica.fit_transform(train_array)
+    #components, mixing, n_iter
+
+    fa = FactorAnalysis(n_components=2)
+    #train_embedded = fa.fit_transform(train_array)
+    '''Attributes:	
+components_ : array, [n_components, n_features], Components with maximum variance.
+loglike_ : list, [n_iterations], The log likelihood at each iteration.
+noise_variance_ : array, shape=(n_features,), The estimated noise variance for each feature.
+n_iter_ : int, Number of iterations run.
+'''
+
+    ipca = IncrementalPCA(n_components=2)
+    #train_embedded = ipca.fit_transform(train_array)
+
     print(train_embedded.shape)
     plt.clf()
     plt.cla()

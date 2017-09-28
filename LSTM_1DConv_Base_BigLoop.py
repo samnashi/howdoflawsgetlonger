@@ -360,22 +360,25 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 
-param_dict_HLR['BatchSize'] = [128,128,128]
-param_dict_HLR['FeatWeight'] = [2,2,2]
+param_dict_HLR['BatchSize'] = [128]
+param_dict_HLR['FeatWeight'] = [2]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-param_dict_HLR['GenPad'] = [128,128,128]
-param_dict_HLR['ConvAct']=['relu','relu','relu']
-param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
-param_dict_HLR['KernelReg']=[l1_l2(),l1(),l2()]
-param_dict_HLR['ConvBlockDepth'] = [3,3,3]
-param_dict_HLR['id_pre'] = [] #initialize to blank first
+param_dict_HLR['GenPad'] = [128]
+param_dict_HLR['ConvAct']=['relu']
+param_dict_HLR['DenseAct']=['tanh']
+param_dict_HLR['KernelReg']=[l1_l2()]
+param_dict_HLR['ConvBlockDepth'] = [3]
+#for id_pre: omit the initial "Weights_", paste the part after the underscore.
+param_dict_HLR['id_pre'] = ['800_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_relu_ca_tanh_da_3_cbd_l1l2_kr_HLR'] #initialize to blank first
 param_dict_HLR['id_post'] = []
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
-    param_dict_HLR['id_pre'].append("HLR_" + str(z))
+    if len(param_dict_HLR['id_pre']) == 0:
+        param_dict_HLR['id_pre'].append("HLR_" + str(z))
+
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_sful_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -394,6 +397,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
 
 #check lengths after the idpre and idpost aren't blank anymore.
 for key in param_dict_HLR.keys():
+    #print("checking key {}".format(key))
     assert(len(param_dict_HLR[key]) == len(param_dict_HLR['BatchSize']))
 
 for z in range(0, len(param_dict_HLR['BatchSize'])):
@@ -414,7 +418,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     num_sequence_draws = 800  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
-    test_only = False  # no training. if finetune is also on, this'll raise an error.
+    test_only = True  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
     use_precomp_sscaler = False
     active_scaler_type = "standard_per_batch" #no capitals!
@@ -429,8 +433,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
         aux_seq_circumnav_amt = 0.65 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
-    save_preds = False
-    save_figs = False
+    save_preds = True
+    save_figs = True
     env = "blockade_runner"  # "cruiser" "chan" #TODO complete the environment_variable_setter
     generator_batch_size_valid_x1 = (generator_batch_size + gen_pad)#4layer conv
     generator_batch_size_valid_x2 = (generator_batch_size + gen_pad)
@@ -452,7 +456,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # Weights_200_conv1d_samepad_1_128shortrun
     identifier_post_training = id_post
     # identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
-    identifier_pre_training = id_pre  # for now, make hardcode what you want to finetune
+    identifier_pre_training = id_pre  # for now hardcode what you want to finetune
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     Base_Path = "./"
     image_path = "./images/"
@@ -751,7 +755,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
                 test_i += generator_batch_size
             # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
             if save_preds == True:
-                np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
+                np.save(analysis_path + 'pred_convlstm_tiny_' + str(files[0]), arr=y_prediction)
 
             # print(y_prediction.shape)
             # print (x_prediction.shape)
@@ -768,7 +772,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # print("")
             label_truth = scaler_output.transform(X=label_truth_temp)
 
-            resample_interval = 16
+            resample_interval = 1
             label_truth = label_truth[::resample_interval, :]
             y_prediction = y_prediction[::resample_interval, :]
 

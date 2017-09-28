@@ -109,12 +109,12 @@ num_epochs = 2 #individual. like how many times is the net trained on that seque
 num_sequence_draws = 1200 #how many times the training corpus is sampled.
 generator_batch_size = 128
 finetune = False
-test_only = False #no training. if finetune is also on, this'll raise an error.
+test_only = True #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
 sequence_circumnavigation_amt = 0.5
 save_preds = True
 save_figs = False
-identifier_pre_training = '_small_' #weights to initialize with, if fine tuning is on.
+identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
 identifier_post_training = "_small_l1_" #weight name to save as
 # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
@@ -207,6 +207,8 @@ if (finetune == False and weights_present_indicator == False and test_only == Fa
         #print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
         train_array = np.load(data_load_path)
         label_array = np.load(label_load_path)[:,1:] #,1: is an artifact, StepIndex is dropped, was only there to ensure rigidity
+        if train_array.shape[1] != 11:
+            train_array=train_array[:,1:]
         #-----------COMMENT THESE OUT IF YOU WANT RESCALER ON----------------------------------
         #train_array = np.reshape(train_array,(1,train_array.shape[0],train_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
@@ -303,7 +305,6 @@ if test_weights_present_indicator == True:
     print("after shuffling: {}".format(combined_filenames))  # shuffling works ok.
 
     i=0
-    #TODO: still only saves single results.
     score_rows_list = []
     for files in combined_filenames:
         i=i+1
@@ -314,15 +315,17 @@ if test_weights_present_indicator == True:
         # print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
         test_array = np.load(data_load_path)
         label_array = np.load(label_load_path)[:, 1:]
+        if test_array.shape[1] != 11:
+            test_array=test_array[:,1:]
         #--------COMMENTED OUT BECAUSE OF SCALER IN THE GENERATOR-----------------------------------
         #test_array = np.reshape(test_array, (1, test_array.shape[0], test_array.shape[1]))
         #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label doesn't need to be 3D
         print("filename: {}, data/label shape: {}, {}".format(str(files[0]),test_array.shape, label_array.shape))
         predictions_length = generator_batch_size * (label_array.shape[0]//generator_batch_size)
         #largest integer multiple of the generator batch size that fits into the length of the sequence.
-
+        #TODO update to new API regarding initialization of precomputed coeffs.
         test_generator = pair_generator_lstm(test_array, label_array, start_at = 0,
-                                             generator_batch_size=generator_batch_size, use_precomputed_coeffs = True)
+                                             generator_batch_size=generator_batch_size, use_precomputed_coeffs = False)
         row_dict = {}
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
                                          max_queue_size=test_array.shape[0], use_multiprocessing=False)
@@ -333,6 +336,43 @@ if test_weights_present_indicator == True:
         row_dict['mae'] =score[2] #'mean_absolute_error'
         row_dict['mape'] = score[3] #'mean_absolute_percentage_error'
         score_rows_list.append(row_dict)
+
+        test_generator = pair_generator_lstm(test_array, label_array, start_at=0,
+                                                    generator_batch_size=generator_batch_size,
+                                                    use_precomputed_coeffs=use_precomp_sscaler)
+        prediction_length = (int(1.0 * (generator_batch_size * (label_array.shape[0] // generator_batch_size))))
+        test_i = 0
+        # Kindly declare the shape
+        x_prediction = np.zeros(shape=[1, prediction_length, 4])
+        y_prediction = np.zeros(shape=[1, prediction_length, 4])
+
+        while test_i <= prediction_length - generator_batch_size:
+            x_test_batch, y_test_batch = test_generator.next()
+            x_prediction[0, test_i:test_i + generator_batch_size, :] = model.predict_on_batch(x_test_batch)
+            y_prediction[0, test_i:test_i + generator_batch_size, :] = y_test_batch
+            test_i += generator_batch_size
+        # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
+        if save_preds == True:
+            np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
+
+        # print(y_prediction.shape)
+        # print (x_prediction.shape)
+        # print ("label array shape: {}".format(label_array.shape))
+
+        # print("y_prediction shape: {}".format(y_prediction.shape))
+        y_prediction_temp = y_prediction
+        y_prediction = np.reshape(y_prediction, newshape=(y_prediction_temp.shape[1], y_prediction_temp.shape[2]))
+        label_truth = label_array[0:y_prediction.shape[0], :]
+        # print (label_truth.shape)
+        label_truth_temp = label_truth
+        scaler_output = sklearn.preprocessing.StandardScaler()  # TODO: this should use the precomputed coeffs as well...
+        #scaler_output = set_standalone_scaler_params(scaler_output)
+        # print("")
+        #label_truth = scaler_output.transform(X=label_truth_temp)
+
+        resample_interval = 16
+        label_truth = label_truth[::resample_interval, :]
+        y_prediction = y_prediction[::resample_interval, :]
 
     score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
     score_df.to_csv('scores_lstm_' + identifier_post_training + '.csv')
@@ -431,5 +471,4 @@ if test_weights_present_indicator == True:
         # np.savetxt(Base_Path + 'results/TestResult_' + str(num_sequence_draws) + identifier + '.txt', np.asarray(score),
         #            fmt='%5.6f', delimiter=' ', newline='\n', header='loss, acc',
         #            footer=str(), comments='# ')
-
 
