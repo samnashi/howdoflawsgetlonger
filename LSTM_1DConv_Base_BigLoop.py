@@ -36,14 +36,32 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
-def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2):
-    '''reference SMALL BiLSTM with batchnorm and elu TD-dense.
+def reference_bilstm_small_stateful(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = True,imp = 2, batch_size=128):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = Bidirectional(LSTM(128, kernel_initializer=k_init, return_sequences=True,
+    h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(input_tensor)
     i = BatchNormalization()(h)
-    j = Bidirectional(LSTM(128, kernel_initializer=k_init, return_sequences=True,
+    j = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation='sigmoid',
+                              kernel_regularizer=k_reg))(j)
+    #l = BatchNormalization()(k)
+    #out = Dense(4)(l)
+    out = k
+    return out
+
+def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(i)
     j = BatchNormalization()(j)
@@ -79,9 +97,9 @@ def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu
     b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(1, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(1, activation=dense_act)(g)
+    return d
 
 
 def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None,k_init='lecun_normal'):
@@ -90,9 +108,9 @@ def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu
     b = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(feature_weighting, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(feature_weighting, activation=dense_act)(g)
+    return d
 
 # -----------------------------------------------------------------------------------------------------------------------
 def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
@@ -103,9 +121,9 @@ def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_a
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
     e = BatchNormalization()(d)
     f = Conv1D(32, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
-    g = BatchNormalization()(f)
-    h = Dense(1, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(f)
+    #h = Dense(1, activation=dense_act)(g)
+    return f
 
 
 def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
@@ -116,9 +134,9 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
     e = BatchNormalization()(d)
     f = Conv1D(64, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
-    g = BatchNormalization()(f)
-    h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(f)
+    #h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
+    return f
 
 def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
@@ -151,9 +169,9 @@ def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', d
     b = Conv1D(8, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(1, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(1, activation=dense_act,kernel_initializer=k_init)(g)
+    return d
 
 def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
     '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
@@ -161,9 +179,9 @@ def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', d
     b = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
+    return d
 
 # -----------------------------------------------------------------------------------------------------------------------
 
@@ -357,7 +375,7 @@ reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You ha
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_sful_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -479,6 +497,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     #two loops. 2 vs. 3 layers.
     if cbd == 2:
         if gen_pad == 128:
+            print("cbd 2 and gen pad 128 chosen: ")
             g1 = conv_block_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
             f2 = conv_block_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
             g3 = conv_block_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
@@ -516,6 +535,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             f10 = conv_block_3layers_normal_pc_flatten(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
             f11 = conv_block_3layers_normal_pc_flatten(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     else:
+        print("else block chosen.")
         g1 = conv_block_double_param_count_narrow_window(input_tensor=a1, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
         f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
         g3 = conv_block_double_param_count_narrow_window(input_tensor=a3, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
@@ -541,7 +561,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
     optimizer_used = rmsprop()
-    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+    model.compile(loss='msle', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
@@ -591,6 +611,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
             train_array = np.load(data_load_path)
             label_array = np.load(label_load_path)[:, 1:]
+            if train_array.shape[1] != 11:
+                train_array = train_array[:,1:]
             print("data/label shape: {}, {}, draw #: {}".format(train_array.shape, label_array.shape, i))
             # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!

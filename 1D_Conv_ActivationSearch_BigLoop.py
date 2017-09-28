@@ -25,7 +25,7 @@ import sklearn.preprocessing
 #     conv_block_normal_param_count_narrow_window, conv_block_double_param_count_narrow_window,\
 #     conv_block_double_param_count_narrow_window_causal, conv_block_normal_param_count_narrow_window_causal, reference_bilstm
 
-np.set_printoptions(threshold=int('nan'))
+#np.set_printoptions(threshold=int('nan'))
 
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.currently set to 1d.'''
@@ -307,12 +307,12 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 
-param_dict_HLR['BatchSize'] = [256,256,256]
+param_dict_HLR['BatchSize'] = [128,128,128]
 param_dict_HLR['FeatWeight'] = [2,2,2]
 param_dict_HLR['GenPad'] = [128,128,128]
 param_dict_HLR['ConvAct']=['relu','relu','relu']
 param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
-param_dict_HLR['KernelReg']=[l1_l2(),l1(),l2()]
+param_dict_HLR['KernelReg']=[l2(),l1(),l1_l2()]
 param_dict_HLR['ConvBlockDepth'] = [3,3,3]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
@@ -357,8 +357,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 700  # how many times the training corpus is sampled.
+    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 800  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -555,6 +555,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
             train_array = np.load(data_load_path)
             label_array = np.load(label_load_path)[:, 1:]
+            if train_array.shape[1] != 11:
+                train_array = train_array[:,1:]
             print("data/label shape: {}, {}, draw #: {}".format(train_array.shape, label_array.shape, i))
             # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
