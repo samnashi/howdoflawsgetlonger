@@ -16,7 +16,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 '''Characterizes sequences. Calculates the relevant statistics.'''
 
 #FAR FROM COMPLETE
-def generator_chunker(array_raw, chunker_batch_size, start_at = 0):
+def generator_chunker(array_raw, chunker_batch_size, start_at = 0,scaler_active=True,scaler_type='standard_per_batch'):
     "use automatic cutting."
     #find largest multiple of the batch size that'd go into the array. largest common multiple
     assert type(array_raw) == np.ndarray
@@ -24,10 +24,14 @@ def generator_chunker(array_raw, chunker_batch_size, start_at = 0):
     array_trimmed = array_raw[0:lcm,:]
     #cut down the array
     index = start_at #initialize
+    if scaler_active == True:
+        scaler = StandardScaler()
     while 1:
         x = array_trimmed[index:index+chunker_batch_size,:]
         index = index+chunker_batch_size
         assert x.shape[0]==chunker_batch_size
+        if scaler_active == True and scaler_type=='standard_per_batch':
+            x = scaler.fit_transform(x)
         yield x
 
 
