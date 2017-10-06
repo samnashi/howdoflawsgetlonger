@@ -36,7 +36,7 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
-def reference_bilstm_small_stateful(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = True,imp = 2, batch_size=128):
+def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
     '''reference SMALL BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
@@ -47,32 +47,14 @@ def reference_bilstm_small_stateful(input_tensor,k_init=lecun_normal(seed=1337),
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(i)
     j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation='sigmoid',
+    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation=dense_act,
                               kernel_regularizer=k_reg))(j)
     #l = BatchNormalization()(k)
     #out = Dense(4)(l)
     out = k
     return out
 
-def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2):
-    '''reference SMALL BiLSTM with batchnorm and TD-dense.
-    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp,stateful=sf))(input_tensor)
-    i = BatchNormalization()(h)
-    j = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp,stateful=sf))(i)
-    j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation='sigmoid',
-                              kernel_regularizer=k_reg))(j)
-    #l = BatchNormalization()(k)
-    #out = Dense(4)(l)
-    out = k
-    return out
-
-def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1(),rec_reg=l1(), sf = False,imp = 2):
+def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1(),rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = Bidirectional(LSTM(200, kernel_initializer=k_init, return_sequences=True,
@@ -83,12 +65,43 @@ def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1()
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(i)
     j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation='sigmoid',
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
                               kernel_regularizer=k_reg))(j)
     # l = BatchNormalization()(k)
     # out = Dense(4)(l)
     out = k
     return out
+
+def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
+def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
@@ -360,26 +373,24 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
 param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
 param_dict_list = []
 
-param_dict_HLR['BatchSize'] = [128]
-param_dict_HLR['FeatWeight'] = [2]
+param_dict_HLR['BatchSize'] = [128,128,128]
+param_dict_HLR['FeatWeight'] = [2,2,2]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-param_dict_HLR['GenPad'] = [128]
-param_dict_HLR['ConvAct']=['relu']
-param_dict_HLR['DenseAct']=['tanh']
-param_dict_HLR['KernelReg']=[l1_l2()]
-param_dict_HLR['ConvBlockDepth'] = [3]
-#for id_pre: omit the initial "Weights_", paste the part after the underscore.
-param_dict_HLR['id_pre'] = ['800_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_relu_ca_tanh_da_3_cbd_l1l2_kr_HLR'] #initialize to blank first
+param_dict_HLR['GenPad'] = [128,128,128]
+param_dict_HLR['ConvAct']=['relu','relu','relu']
+param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
+param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2()]
+param_dict_HLR['ConvBlockDepth'] = [3,3,3]
+param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
+param_dict_HLR['ScalerType'] = ['standard_per_batch','standard','robust'] #NOT ACTIVE YET
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
-    if len(param_dict_HLR['id_pre']) == 0:
-        param_dict_HLR['id_pre'].append("HLR_" + str(z))
-
+    param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_convlstm_ssbatch_bn_nofinalbn_128b_tinylstm_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
-        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
+    id_post_temp = "_conv_nlstm__minmax_128b_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
             reg_id = "l1l2"
@@ -397,7 +408,6 @@ for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
 
 #check lengths after the idpre and idpost aren't blank anymore.
 for key in param_dict_HLR.keys():
-    #print("checking key {}".format(key))
     assert(len(param_dict_HLR[key]) == len(param_dict_HLR['BatchSize']))
 
 for z in range(0, len(param_dict_HLR['BatchSize'])):
@@ -411,17 +421,18 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     kr = param_dict_HLR['KernelReg'][z]
     da = param_dict_HLR['DenseAct'][z]
     ca = param_dict_HLR['ConvAct'][z]
+    st = param_dict_HLR['ScalerType'][z]
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
+    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
     num_sequence_draws = 800  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
-    test_only = True  # no training. if finetune is also on, this'll raise an error.
+    test_only = False  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
     use_precomp_sscaler = False
-    active_scaler_type = "standard_per_batch" #no capitals!
+    active_scaler_type = st #no capitals!
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
@@ -433,8 +444,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
         aux_seq_circumnav_amt = 0.65 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
-    save_preds = True
-    save_figs = True
+    save_preds = False
+    save_figs = False
     env = "blockade_runner"  # "cruiser" "chan" #TODO complete the environment_variable_setter
     generator_batch_size_valid_x1 = (generator_batch_size + gen_pad)#4layer conv
     generator_batch_size_valid_x2 = (generator_batch_size + gen_pad)
@@ -456,7 +467,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     # Weights_200_conv1d_samepad_1_128shortrun
     identifier_post_training = id_post
     # identifier_pre_training = "_conv1d_samepad_" + str(num_epochs) + "_" + str(generator_batch_size) + "shortrun"
-    identifier_pre_training = id_pre  # for now hardcode what you want to finetune
+    identifier_pre_training = id_pre  # for now, make hardcode what you want to finetune
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     Base_Path = "./"
     image_path = "./images/"
@@ -558,14 +569,14 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     g = concatenate(tensors_to_concat)
     h = BatchNormalization()(g)
     # i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    i = reference_bilstm_small(input_tensor = h, k_reg=kr,rec_reg=kr)
+    i = reference_lstm_dense(input_tensor = h, k_reg=kr, rec_reg=kr,dense_act=da)
     #j = BatchNormalization()(i)
     out = Dense(4)(i)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
     optimizer_used = rmsprop()
-    model.compile(loss='msle', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
@@ -755,7 +766,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
                 test_i += generator_batch_size
             # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
             if save_preds == True:
-                np.save(analysis_path + 'pred_convlstm_tiny_' + str(files[0]), arr=y_prediction)
+                np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
 
             # print(y_prediction.shape)
             # print (x_prediction.shape)
@@ -772,7 +783,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # print("")
             label_truth = scaler_output.transform(X=label_truth_temp)
 
-            resample_interval = 1
+            resample_interval = 16
             label_truth = label_truth[::resample_interval, :]
             y_prediction = y_prediction[::resample_interval, :]
 
