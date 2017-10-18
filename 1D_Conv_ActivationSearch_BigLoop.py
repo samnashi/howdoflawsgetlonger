@@ -13,7 +13,7 @@ from keras import metrics
 from keras.optimizers import adam, rmsprop
 import pandas as pd
 import scipy.io as sio
-from keras.callbacks import CSVLogger
+from keras.callbacks import CSVLogger, TerminateOnNaN
 import os
 import csv
 import json
@@ -25,7 +25,7 @@ import sklearn.preprocessing
 #     conv_block_normal_param_count_narrow_window, conv_block_double_param_count_narrow_window,\
 #     conv_block_double_param_count_narrow_window_causal, conv_block_normal_param_count_narrow_window_causal, reference_bilstm
 
-#np.set_printoptions(threshold=int('nan'))
+# np.set_printoptions(threshold='nan')
 
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.currently set to 1d.'''
@@ -36,6 +36,133 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
+def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    #l = BatchNormalization()(k)
+    #out = Dense(4)(l)
+    out = k
+    return out
+
+def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1(),rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    # l = BatchNormalization()(k)
+    # out = Dense(4)(l)
+    out = k
+    return out
+
+def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
+def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
+def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_huge(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
@@ -44,10 +171,25 @@ def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu
     b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(1, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(1, activation=dense_act)(g)
+    return d
 
+def reference_gru_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = GRU(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = GRU(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
 
 def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None,k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
@@ -55,9 +197,9 @@ def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu
     b = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(feature_weighting, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(feature_weighting, activation=dense_act)(g)
+    return d
 
 # -----------------------------------------------------------------------------------------------------------------------
 def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
@@ -68,9 +210,9 @@ def conv_block_3layers_normal_param_count(input_tensor, conv_act='relu', dense_a
     d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
     e = BatchNormalization()(d)
     f = Conv1D(32, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
-    g = BatchNormalization()(f)
-    h = Dense(1, activation=dense_act)(g)
-    return h
+    #g = BatchNormalization()(f)
+    #h = Dense(1, activation=dense_act)(g)
+    return f
 
 
 def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
@@ -81,11 +223,12 @@ def conv_block_3layers_double_param_count(input_tensor, conv_act='relu', dense_a
     d = Conv1D(32, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
     e = BatchNormalization()(d)
     f = Conv1D(64, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
-    g = BatchNormalization()(f)
-    h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(f)
+    #h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
+    return f
 
-def conv_block_3layers_normalpc_bninput_nodense(input_tensor, conv_act='relu', dense_act='relu', k_reg=None, k_init='lecun_normal'):
+# ---------------------------------------------------------------------------------------------------
+def conv_block_3layers_normal_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
     '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
     input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
@@ -98,7 +241,7 @@ def conv_block_3layers_normalpc_bninput_nodense(input_tensor, conv_act='relu', d
     return g
 
 
-def conv_block_3layers_doublepc_bninput_nodense(input_tensor, conv_act='relu', dense_act='relu', feature_weighting=2, k_reg=None, k_init='lecun_normal'):
+def conv_block_3layers_double_pc_flatten(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
     input_tensor = BatchNormalization()(input_tensor)
     b = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
@@ -109,6 +252,32 @@ def conv_block_3layers_doublepc_bninput_nodense(input_tensor, conv_act='relu', d
     g = BatchNormalization()(f)
     #h = Flatten()(g)
     return g
+
+#-----------------------------------------------------------------------------------------------------------
+def conv_block_3layers_normal_pc_micro(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
+    '''f means it's the normal param count branch. Padding required: 128#reqbatchsize -(128 - (128-1)/1 + (2-1)/1) = 128'''
+    input_tensor = BatchNormalization()(input_tensor)
+    b = Conv1D(4, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(8, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(16, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
+    g = BatchNormalization()(f)
+    #h = Flatten()(g)
+    return g
+
+
+def conv_block_3layers_double_pc_micro(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
+    '''g means it's the output of the "twice the number of parameters"  branch'''
+    input_tensor = BatchNormalization()(input_tensor)
+    b = Conv1D(8, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(16, kernel_size =(65), padding='valid',activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)
+    e = BatchNormalization()(d)
+    f = Conv1D(32, kernel_size=(33), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(e)  # gives me 128x1
+    g = BatchNormalization()(f)
+    #h = Flatten()(g)
+    return g
 # ---------------------NARROW WINDOW-------------------------------------------------------------------------------------
 def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
     '''requires generator batch for this column to be increased by 14. 2 * (8-1) = 14. '''
@@ -116,9 +285,9 @@ def conv_block_normal_param_count_narrow_window(input_tensor, conv_act='relu', d
     b = Conv1D(8, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(1, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(1, activation=dense_act,kernel_initializer=k_init)(g)
+    return d
 
 def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=2,k_reg=None,k_init='lecun_normal'):
     '''requires generator batch for this column to be increased by 28. (15-1) + 2 * (8-1) = 28'''
@@ -126,9 +295,9 @@ def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', d
     b = Conv1D(16, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
     c = BatchNormalization()(b)
     d = Conv1D(32, kernel_size=(17), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    g = BatchNormalization()(d)
-    h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
-    return h
+    #g = BatchNormalization()(d)
+    #h = Dense(feature_weighting, activation=dense_act,kernel_initializer=k_init)(g)
+    return d
 
 # -----------------------------------------------------------------------------------------------------------------------
 
@@ -154,10 +323,10 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
             scaler = sklearn.preprocessing.StandardScaler()
             scaler_step_index_only = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
-        elif scaler_type == 'minmax':
+        elif scaler_type == 'minmax' or scaler_type == "minmax_per_batch":
             scaler = sklearn.preprocessing.MinMaxScaler()
             label_scaler = sklearn.preprocessing.MinMaxScaler()
-        elif scaler_type == 'robust':
+        elif scaler_type == 'robust' or scaler_type == 'robust_per_batch':
             scaler = sklearn.preprocessing.RobustScaler()
             label_scaler = sklearn.preprocessing.RobustScaler()
         elif scaler_type == 'standard_minmax':
@@ -224,7 +393,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-    if not scaled or scaler_type == "standard_per_batch":
+    if not scaled or scaler_type == "standard_per_batch" or scaler_type == 'minmax_per_batch' or ("_per_batch" in scaler_type) :
         data_scaled = data
         labels_scaled = labels
 
@@ -286,7 +455,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (x10.shape[1] == generator_batch_size_valid_x10)
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
-        if scaler_type == "standard_per_batch":
+        if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type):
             # x1s = scaler.fit_transform(X=x1)
             # x2s = scaler.fit_transform(X=x2)
             # x3s = scaler.fit_transform(X=x3)
@@ -309,21 +478,22 @@ param_dict_list = []
 
 param_dict_HLR['BatchSize'] = [128,128,128]
 param_dict_HLR['FeatWeight'] = [2,2,2]
+#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['GenPad'] = [128,128,128]
 param_dict_HLR['ConvAct']=['relu','relu','relu']
-param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
-param_dict_HLR['KernelReg']=[l2(),l1(),l1_l2()]
+param_dict_HLR['DenseAct']=['sigmoid','sigmoid','sigmoid']
+param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2()]
 param_dict_HLR['ConvBlockDepth'] = [3,3,3]
-#NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
+param_dict_HLR['ScalerType'] = ['minmax_per_batch','robust_per_batch','standard_per_batch']
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_stdperbatch_rmsp_nofinalbn_msle_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
-        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_"
+    id_post_temp = "_conv_micro_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
             reg_id = "l1l2"
@@ -354,29 +524,30 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     kr = param_dict_HLR['KernelReg'][z]
     da = param_dict_HLR['DenseAct'][z]
     ca = param_dict_HLR['ConvAct'][z]
+    st = param_dict_HLR['ScalerType'][z]
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 800  # how many times the training corpus is sampled.
+    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 1300  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
     use_precomp_sscaler = False
-    active_scaler_type = "standard_per_batch" #no capitals!
+    active_scaler_type = st #no capitals!
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-    base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
         aux_circumnav_onset_draw = 600
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 1.0 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
-    save_preds = False
+    save_preds = True
     save_figs = False
     env = "blockade_runner"  # "cruiser" "chan" #TODO complete the environment_variable_setter
     generator_batch_size_valid_x1 = (generator_batch_size + gen_pad)#4layer conv
@@ -444,6 +615,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     #two loops. 2 vs. 3 layers.
     if cbd == 2:
         if gen_pad == 128:
+            print("cbd 2 and gen pad 128 chosen: ")
             g1 = conv_block_double_param_count(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
             f2 = conv_block_normal_param_count(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
             g3 = conv_block_double_param_count(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
@@ -469,18 +641,19 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # f10 = conv_block_3layers_normal_param_count(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
             # f11 = conv_block_3layers_normal_param_count(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
 
-            g1 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a1, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
-            f2 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a2, k_reg=kr, conv_act=ca, dense_act=da)
-            g3 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a3, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
-            f4 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a4, k_reg=kr, conv_act=ca, dense_act=da)
-            g5 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a5, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
-            f6 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a6, k_reg=kr, conv_act=ca, dense_act=da)
-            g7 = conv_block_3layers_doublepc_bninput_nodense(input_tensor=a7, feature_weighting=fw, k_reg=kr, conv_act=ca, dense_act=da)
-            f8 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a8, k_reg=kr, conv_act=ca, dense_act=da)
-            f9 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a9, k_reg=kr, conv_act=ca, dense_act=da)
-            f10 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a10, k_reg=kr, conv_act=ca, dense_act=da)
-            f11 = conv_block_3layers_normalpc_bninput_nodense(input_tensor=a11, k_reg=kr, conv_act=ca, dense_act=da)
+            g1 = conv_block_3layers_double_pc_micro(input_tensor=a1,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f2 = conv_block_3layers_normal_pc_micro(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
+            g3 = conv_block_3layers_double_pc_micro(input_tensor=a3,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f4 = conv_block_3layers_normal_pc_micro(input_tensor=a4,k_reg=kr,conv_act=ca,dense_act=da)
+            g5 = conv_block_3layers_double_pc_micro(input_tensor=a5,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f6 = conv_block_3layers_normal_pc_micro(input_tensor=a6,k_reg=kr,conv_act=ca,dense_act=da)
+            g7 = conv_block_3layers_double_pc_micro(input_tensor=a7,feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
+            f8 = conv_block_3layers_normal_pc_micro(input_tensor=a8,k_reg=kr,conv_act=ca,dense_act=da)
+            f9 = conv_block_3layers_normal_pc_micro(input_tensor=a9,k_reg=kr,conv_act=ca,dense_act=da)
+            f10 = conv_block_3layers_normal_pc_micro(input_tensor=a10,k_reg=kr,conv_act=ca,dense_act=da)
+            f11 = conv_block_3layers_normal_pc_micro(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
     else:
+        print("else block chosen.")
         g1 = conv_block_double_param_count_narrow_window(input_tensor=a1, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
         f2 = conv_block_normal_param_count_narrow_window(input_tensor=a2,k_reg=kr,conv_act=ca,dense_act=da)
         g3 = conv_block_double_param_count_narrow_window(input_tensor=a3, feature_weighting=fw,k_reg=kr,conv_act=ca,dense_act=da)
@@ -498,14 +671,14 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
     g = concatenate(tensors_to_concat)
     h = BatchNormalization()(g)
-    i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    #j = BatchNormalization()(i)
-    out = Dense(4)(i)
+    i = Dense(4,activation=da,kernel_regularizer=kr)(h)
+    j = BatchNormalization()(i)
+    out = Dense(4)(j)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-    optimizer_used = rmsprop()
-    model.compile(loss='msle', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse'])
+    optimizer_used = rmsprop(lr=0.002)
+    model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
     print("Model summary: {}".format(model.summary()))
 
     print("Inputs: {}".format(model.input_shape))
@@ -537,6 +710,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
         print("Are weights (with the given name) to initialize with present? {}".format(weights_present_indicator))
 
     csv_logger = CSVLogger(filename='./analysis/logtrain' + identifier_post_training + ".csv", append=True)
+    nan_terminator = TerminateOnNaN()
     active_seq_circumnav_amt = 0.0 #predeclare a float.
 
     if (finetune == False and weights_present_indicator == False and test_only == False) or (
@@ -561,33 +735,40 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
 
+
+            nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 3)
+            shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
+            active_starting_position = shuffled_starting_position #doesn't start from 0, if the model is still in the 1st phase of training
+
             if adaptive_circumnav == True and i >= aux_circumnav_onset_draw:
                 active_seq_circumnav_amt = aux_seq_circumnav_amt
+                active_starting_position = 0
 
-            nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
-            shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
+
             if finetune == True:  # load the weights
                 finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
                 model.load_weights(finetune_init_weights_filename, by_name=True)
 
-            train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
+            train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=active_starting_position,
                                                          generator_batch_size=generator_batch_size,
                                                          use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                          scaler_type=active_scaler_type)
             training_hist = model.fit_generator(train_generator, steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size),
                                                 epochs=num_epochs, verbose=2,
-                                                callbacks=[csv_logger])
+                                                callbacks=[csv_logger, nan_terminator])
 
         if weights_present_indicator == True and finetune == True:
             print("fine-tuning/partial training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
+            model.save('./' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         if weights_present_indicator == False and finetune == False:  # fresh training
             print("FRESH training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
+            model.save('./' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         else:  # TESTING ONLY! bypass weights present indicator.

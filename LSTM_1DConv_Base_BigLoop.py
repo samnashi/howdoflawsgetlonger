@@ -13,7 +13,7 @@ from keras import metrics
 from keras.optimizers import adam, rmsprop
 import pandas as pd
 import scipy.io as sio
-from keras.callbacks import CSVLogger
+from keras.callbacks import CSVLogger, TerminateOnNaN
 import os
 import csv
 import json
@@ -86,6 +86,20 @@ def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l
     out = j
     return out
 
+def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
 def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
@@ -102,6 +116,53 @@ def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(
     out = k
     return out
 
+def reference_lstm_dense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_huge(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
 
 # ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
 def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
@@ -114,6 +175,21 @@ def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu
     #h = Dense(1, activation=dense_act)(g)
     return d
 
+def reference_gru_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = GRU(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = GRU(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
 
 def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None,k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
@@ -220,10 +296,10 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
             scaler = sklearn.preprocessing.StandardScaler()
             scaler_step_index_only = sklearn.preprocessing.StandardScaler()
             label_scaler = sklearn.preprocessing.StandardScaler()
-        elif scaler_type == 'minmax':
+        elif scaler_type == 'minmax' or scaler_type == "minmax_per_batch":
             scaler = sklearn.preprocessing.MinMaxScaler()
             label_scaler = sklearn.preprocessing.MinMaxScaler()
-        elif scaler_type == 'robust':
+        elif scaler_type == 'robust' or scaler_type == 'robust_per_batch':
             scaler = sklearn.preprocessing.RobustScaler()
             label_scaler = sklearn.preprocessing.RobustScaler()
         elif scaler_type == 'standard_minmax':
@@ -290,7 +366,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         # labels_scaled = np.reshape(labels_scaled, (1, labels_scaled.shape[0],labels_scaled.shape[1]))
         # ----------------------------------------------------------------------------------------------
         # print("before expand dims: data shape: {}, label shape: {}".format(data_scaled.shape,labels_scaled.shape))
-    if not scaled or scaler_type == "standard_per_batch":
+    if not scaled or scaler_type == "standard_per_batch" or scaler_type == 'minmax_per_batch' or ("_per_batch" in scaler_type) :
         data_scaled = data
         labels_scaled = labels
 
@@ -352,7 +428,7 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         assert (x10.shape[1] == generator_batch_size_valid_x10)
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
-        if scaler_type == "standard_per_batch":
+        if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type):
             # x1s = scaler.fit_transform(X=x1)
             # x2s = scaler.fit_transform(X=x2)
             # x3s = scaler.fit_transform(X=x3)
@@ -378,18 +454,18 @@ param_dict_HLR['FeatWeight'] = [2,2,2]
 #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
 param_dict_HLR['GenPad'] = [128,128,128]
 param_dict_HLR['ConvAct']=['relu','relu','relu']
-param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
+param_dict_HLR['DenseAct']=['tanh','sigmoid','sigmoid']
 param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2()]
 param_dict_HLR['ConvBlockDepth'] = [3,3,3]
 param_dict_HLR['id_pre'] = [] #initialize to blank first
 param_dict_HLR['id_post'] = []
-param_dict_HLR['ScalerType'] = ['standard_per_batch','standard','robust'] #NOT ACTIVE YET
+param_dict_HLR['ScalerType'] = ['minmax_per_batch','robust_per_batch','standard_per_batch']
 reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
 for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
     param_dict_HLR['id_pre'].append("HLR_" + str(z))
     #ca = conv activation, da = dense activation, cbd = conv block depth
-    id_post_temp = "_conv_nlstm__minmax_128b_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+    id_post_temp = "_conv_ngru_micro_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
         str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
     if param_dict_HLR['KernelReg'][z] != None:
         if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -425,8 +501,8 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
 
     # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
     # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 800  # how many times the training corpus is sampled.
+    num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
+    num_sequence_draws = 2  # how many times the training corpus is sampled.
     generator_batch_size = bs
     finetune = False
     test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -436,12 +512,12 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     if active_scaler_type != "None":
         assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-    base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
+    base_seq_circumnav_amt = 0.5 #default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
-        aux_circumnav_onset_draw = 450
+        aux_circumnav_onset_draw = 1
         assert(aux_circumnav_onset_draw < num_sequence_draws)
-        aux_seq_circumnav_amt = 0.65 #only used if adaptive_circumnav is True
+        aux_seq_circumnav_amt = 1.0 #only used if adaptive_circumnav is True
         assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
     save_preds = False
@@ -569,13 +645,13 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
     g = concatenate(tensors_to_concat)
     h = BatchNormalization()(g)
     # i = Dense(64,activation=da,kernel_regularizer=kr)(h)
-    i = reference_lstm_dense(input_tensor = h, k_reg=kr, rec_reg=kr,dense_act=da)
-    #j = BatchNormalization()(i)
-    out = Dense(4)(i)
+    i = reference_gru_dense_micro(input_tensor = h, k_reg=kr, rec_reg=kr,dense_act=da)
+    j = BatchNormalization()(i)
+    out = Dense(4)(j)
 
     model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
     plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-    optimizer_used = rmsprop()
+    optimizer_used = rmsprop(lr=0.002)
     model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
     print("Model summary: {}".format(model.summary()))
 
@@ -608,6 +684,7 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
         print("Are weights (with the given name) to initialize with present? {}".format(weights_present_indicator))
 
     csv_logger = CSVLogger(filename='./analysis/logtrain' + identifier_post_training + ".csv", append=True)
+    nan_terminator = TerminateOnNaN()
     active_seq_circumnav_amt = 0.0 #predeclare a float.
 
     if (finetune == False and weights_present_indicator == False and test_only == False) or (
@@ -632,22 +709,27 @@ for z in range(0, len(param_dict_HLR['BatchSize'])):
             # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
             # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
 
+
+            nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 3)
+            shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
+            active_starting_position = shuffled_starting_position #doesn't start from 0, if the model is still in the 1st phase of training
+
             if adaptive_circumnav == True and i >= aux_circumnav_onset_draw:
                 active_seq_circumnav_amt = aux_seq_circumnav_amt
+                active_starting_position = 0
 
-            nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
-            shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
+
             if finetune == True:  # load the weights
                 finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
                 model.load_weights(finetune_init_weights_filename, by_name=True)
 
-            train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=shuffled_starting_position,
+            train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=active_starting_position,
                                                          generator_batch_size=generator_batch_size,
                                                          use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                          scaler_type=active_scaler_type)
             training_hist = model.fit_generator(train_generator, steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size),
                                                 epochs=num_epochs, verbose=2,
-                                                callbacks=[csv_logger])
+                                                callbacks=[csv_logger, nan_terminator])
 
         if weights_present_indicator == True and finetune == True:
             print("fine-tuning/partial training session completed.")

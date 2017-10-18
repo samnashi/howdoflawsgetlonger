@@ -15,9 +15,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 '''Characterizes sequences. Calculates the relevant statistics.'''
 
-#FAR FROM COMPLETE
+#THIS IS USED IN CHUNKER_TESTER
 def generator_chunker(array_raw, chunker_batch_size, start_at = 0,scaler_active=True,scaler_type='standard_per_batch'):
-    "use automatic cutting."
     #find largest multiple of the batch size that'd go into the array. largest common multiple
     assert type(array_raw) == np.ndarray
     lcm = chunker_batch_size * (array_raw.shape[0] // chunker_batch_size)
@@ -33,29 +32,6 @@ def generator_chunker(array_raw, chunker_batch_size, start_at = 0,scaler_active=
         if scaler_active == True and scaler_type=='standard_per_batch':
             x = scaler.fit_transform(x)
         yield x
-
-
-#FAR FROM COMPLETE
-def calc_covariance(array_list, calculate_each_chunk = True, calculate_cumulative_each_chunk = True, chunks = 5, chunk_mode = 'step'):
-    '''utility to do chunkwise prediction. chunk mode can be "percent_damage" or "step", array list's length should be 1 or 2.
-     calculate each chunk means calculate every chunk's statistics; calculate cumulative means it's like a partial fit
-     with the temporary states saved in between. This method is used in many other modules, even to compare results'''
-    isExhausted = False
-    if (type(array_list) != list) or type(array_list[0]) != np.ndarray or type(array_list[1] != np.ndarray):
-        print("Input is of an incorrect type. You need a list of numpy ndarrays.")
-        raise TypeError
-    if len(array_list) > 2:
-        print("List of input arrays is longer than 2, only the first 2 arrays will be used.")
-    if calculate_cumulative_each_chunk == True and calculate_each_chunk == True:
-        pass
-        #make a two-array generator
-    array_list[0]=None
-    array_list[1]= None
-
-
-
-    return isExhausted
-
 
 #TODO pseudocode in green notebook. complete this before the 29th
 def estimate_nonlinearity_onset(return_complete = True, array_path = "", num_flaws=4, min_batch_size=128):
