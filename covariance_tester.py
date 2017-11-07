@@ -93,6 +93,13 @@ for index_to_load in range(0,len(combined_filenames)):
 print("total length = {}".format(length_total))
 temp_array = np.empty(shape=(length_total, desired_colnumber))
 
+
+list_cov_for_df = []
+list_corr_for_df = []
+filenames_for_df_index=[]
+cov_dict = {}
+corr_dict = {}
+
 for index_to_load in range(0,len(combined_filenames)):
     files = combined_filenames[index_to_load]
     print("files: {}".format(files))
@@ -106,19 +113,60 @@ for index_to_load in range(0,len(combined_filenames)):
         label_train_array = label_train_array[:,1:]
     identifier = files[0][:-4]
 
+    filenames_for_df_index.append(files[0])
+
     #BLOCK FOR INDIVIDUAL SEQUENCES
     relevant_vars_array = aggregate_data_and_label(data_array = train_array,
                                                    label_array=label_train_array,
                                                    desired_colnum=desired_colnumber)
     filename_cov = analysis_path + "cov_complete_" + identifier + ".csv"
     filename_corr = analysis_path + "corrcoef_complete_" + identifier + ".csv"
-    np.savetxt(fname = filename_cov, X = np.cov(relevant_vars_array,rowvar=False),
-               delimiter=",",header = header_corrcoef)
-    np.savetxt(fname = filename_corr, X = np.corrcoef(relevant_vars_array,rowvar=False),
-               delimiter=",",header = header_corrcoef)
+
+    X_cov = np.cov(relevant_vars_array, rowvar=False)
+    X_corr = np.corrcoef(relevant_vars_array, rowvar=False)
+    cov_dict[files[0]] = X_cov.flatten()
+    corr_dict[files[0]] = X_corr.flatten()
+
+    # if index_to_load == 0:
+    #     df_cov = pd.DataFrame(X_cov.flatten())
+    #     df_corr = pd.DataFrame(X_corr.flatten())
+    # if index_to_load != 0:
+    #     df_cov_temp = pd.DataFrame(X_cov.flatten())
+    #     #print(df_cov_temp.info())
+    #     df_corr_temp = pd.DataFrame(X_corr.flatten())
+    #     #print(df_corr_temp.info())
+    #     print("appending")
+    #     df_cov = df_cov.append(df_cov_temp)
+    #     df_corr = df_corr.append(df_corr_temp)
+
+    # list_cov_for_df.append(X_cov)
+    # list_corr_for_df.append(X_corr)
+
+    #ENABLE THE CODE BELOW TO SAVE THE ARRAYS
+    # np.savetxt(fname = filename_cov, X = np.cov(relevant_vars_array,rowvar=False),
+    #            delimiter=",",header = header_corrcoef)
+    # np.savetxt(fname = filename_corr, X = np.corrcoef(relevant_vars_array,rowvar=False),
+    #            delimiter=",",header = header_corrcoef)
     print(("corrcoef and cov for {} saved.").format(identifier))
 
 
+df_cov = pd.DataFrame.from_dict(cov_dict,orient='index') #keys should be the rows.
+df_corr = pd.DataFrame.from_dict(corr_dict,orient='index')
+print(df_cov.describe())
+print(df_corr.describe())
+(df_corr.describe()).to_csv('./df_corr_orientindex_describe.csv')
+(df_cov.describe()).to_csv('./df_cov_orientindex_describe.csv')
+# df_corr.set_index(filenames_for_df_index) doesn't work
+# df_cov.set_index(filenames_for_df_index)
+# print("df_corr: {}".format(df_corr.shape)) #describe needs column names
+# print("df_cov: {}".format(df_cov.shape))
+#df_corr.to_csv('./analysis/df_corr.csv')
+#df_cov.to_csv('./analysis/df_cov.csv')
+#combined_df = pd.DataFrame(data=[list_cov_for_df,list_corr_for_df]) this makes a 2-row DF...
+
+# cov_df = pd.DataFrame(data=list_cov_for_df)
+# corr_df = pd.DataFrame(data=list_corr_for_df)
+#print("combined df describe: {}".format(combined_df.describe()))
 #
 #
 # #seq_group_params = {}
