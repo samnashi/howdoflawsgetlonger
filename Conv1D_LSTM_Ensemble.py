@@ -413,6 +413,9 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
         generator_batch_size_valid_x9 = generator_batch_size + generator_pad
         generator_batch_size_valid_x10 = generator_batch_size + generator_pad
         generator_batch_size_valid_x11 = generator_batch_size + generator_pad
+
+        x_lstm = data_scaled[:, index:index + generator_batch_size, :] #lstm's input.
+
         x1 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x1, 0]),
                         newshape=(1, (generator_batch_size_valid_x1), 1))  # first dim = 0 doesn't work.
         x2 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x2, 1]),
@@ -480,12 +483,13 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
             # x11s = scaler.fit_transform(X=x11)
             ys = label_scaler.fit_transform(X=np.reshape(y,newshape=(y.shape[1],y.shape[2]))) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
             y_re_exp = np.reshape(ys,newshape = (y.shape))
-            yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y_re_exp)
+            yield ([x_lstm,x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], [y_re_exp,y_re_exp])
         else:
-            yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
+            yield ([x_lstm, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], [y,y]) #two outputs, multiple inputs.
 
 
 if __name__ == "__main__":
+
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
@@ -505,7 +509,7 @@ if __name__ == "__main__":
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_conv_micro_240dense_mse_highlr_0start_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_bag_conv_lstm_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -680,15 +684,28 @@ if __name__ == "__main__":
             f11 = conv_block_normal_param_count_narrow_window(input_tensor=a11,k_reg=kr,conv_act=ca,dense_act=da)
         # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
 
+        # reference_bilstm outputs the 64-time-dist-dense unit.
+        lstm_in = Input(shape=(None, 11))  # still need to mod the generator to not pad...
+        # input_lstm = np.asarray([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11])
+
+        lstm = reference_bilstm_big(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm_bn = BatchNormalization()(lstm)
+        lstm_out = Dense(4)(lstm)
+
+        # lstm_out needs to go in.
+
+        #intermediate out should be the lstm's labels..
+
         # define the model first
-        tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
+        tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11,lstm_out]
         g = concatenate(tensors_to_concat)
         h = BatchNormalization()(g)
-        i = Dense(240,activation=da,kernel_regularizer=kr)(h)
+        i = Dense(16,activation=da,kernel_regularizer=kr)(h)
         j = BatchNormalization()(i)
         out = Dense(4)(j)
 
-        model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
+
+        model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
         optimizer_used = rmsprop(lr=0.005)
         model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
@@ -763,7 +780,7 @@ if __name__ == "__main__":
                     finetune_init_weights_filename = 'Weights_' + identifier_pre_training + '.h5'  # hardcode the previous epoch number UP ABOVE
                     model.load_weights(finetune_init_weights_filename, by_name=True)
 
-                train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=active_starting_position,
+                train_generator = pair_generator_1dconv_lstm_bagged(train_array, label_array, start_at=active_starting_position,
                                                              generator_batch_size=generator_batch_size,
                                                              use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                              scaler_type=active_scaler_type)
@@ -851,7 +868,7 @@ if __name__ == "__main__":
                 print(files[0])
                 # print("Metrics: {}".format(model.metrics_names))
                 # steps per epoch is how many times that generator is called
-                test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
+                test_generator = pair_generator_1dconv_lstm_bagged(test_array, label_array, start_at=0,
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                             scaler_type=active_scaler_type)
@@ -873,7 +890,7 @@ if __name__ == "__main__":
                 score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.
-                test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
+                test_generator = pair_generator_1dconv_lstm_bagged(test_array, label_array, start_at=0,
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                             scaler_type=active_scaler_type)
