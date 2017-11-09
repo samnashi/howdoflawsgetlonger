@@ -36,6 +36,24 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
+def reference_bilstm_micro(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(16, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    #l = BatchNormalization()(k)
+    #out = Dense(4)(l)
+    out = k
+    return out
+
 def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
     '''reference SMALL BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
@@ -493,17 +511,17 @@ if __name__ == "__main__":
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
-    param_dict_HLR['BatchSize'] = [128,128]
-    param_dict_HLR['FeatWeight'] = [2,2]
+    param_dict_HLR['BatchSize'] = [128,128,128,128]
+    param_dict_HLR['FeatWeight'] = [2,2,2,2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-    param_dict_HLR['GenPad'] = [128,128]
-    param_dict_HLR['ConvAct']=['elu','elu']
-    param_dict_HLR['DenseAct']=['tanh','tanh']
-    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2()]
-    param_dict_HLR['ConvBlockDepth'] = [3,3]
+    param_dict_HLR['GenPad'] = [128,128,128,128]
+    param_dict_HLR['ConvAct']=['relu','relu','relu','softplus']
+    param_dict_HLR['DenseAct']=['tanh','tanh','tanh','tanh']
+    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
+    param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
     param_dict_HLR['id_pre'] = [] #initialize to blank first
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['robust_per_batch','standard_per_batch']
+    param_dict_HLR['ScalerType'] = ['robust_per_batch','standard_per_batch','minmax_per_batch','standard_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
@@ -546,7 +564,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 600  # how many times the training corpus is sampled.
+        num_sequence_draws = 800  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -685,12 +703,12 @@ if __name__ == "__main__":
         # if you want to use causal: you REALLY need shape[1] (# of steps) to be explicit.
 
         # reference_bilstm outputs the 64-time-dist-dense unit.
-        lstm_in = Input(shape=(None, 11))  # still need to mod the generator to not pad...
+        lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
         # input_lstm = np.asarray([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11])
 
-        lstm = reference_bilstm_big(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
-        lstm_bn = BatchNormalization()(lstm)
-        lstm_out = Dense(4)(lstm)
+        lstm = reference_lstm_nodense(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm_bn = BatchNormalization(name='final_bn')(lstm)
+        lstm_out = Dense(4,name='lstm_output')(lstm)
 
         # lstm_out needs to go in.
 
@@ -698,17 +716,20 @@ if __name__ == "__main__":
 
         # define the model first
         tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11,lstm_out]
-        g = concatenate(tensors_to_concat)
+        g = concatenate(tensors_to_concat,name='concat_all')
         h = BatchNormalization()(g)
-        i = Dense(16,activation=da,kernel_regularizer=kr)(h)
+        i = Dense(64,activation=da,kernel_regularizer=kr,name='dense_post_concat')(h)
         j = BatchNormalization()(i)
-        out = Dense(4)(j)
+        out = Dense(4,name='combined_output')(j)
 
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
         optimizer_used = rmsprop(lr=0.005)
-        model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+        # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
+        # loss_weights = {'main_output': 1., 'aux_output': 0.2})
+
+        model.compile(loss={'combined_output': 'mape', 'lstm_output': 'mse'}, optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
         print("Model summary: {}".format(model.summary()))
 
         print("Inputs: {}".format(model.input_shape))
