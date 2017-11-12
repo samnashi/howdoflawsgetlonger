@@ -111,6 +111,20 @@ def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_
     out = j
     return out
 
+def reference_lstm_nodense_medium(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
 def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
@@ -537,25 +551,25 @@ if __name__ == "__main__":
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
-    param_dict_HLR['BatchSize'] = [128,128,128]
-    param_dict_HLR['FeatWeight'] = [2,2,2]
+    param_dict_HLR['BatchSize'] = [128,128,128,128]
+    param_dict_HLR['FeatWeight'] = [2,2,2,2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-    param_dict_HLR['GenPad'] = [128,128,128]
-    param_dict_HLR['ConvAct']=['relu','softplus','relu']
-    param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
-    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2()]
-    param_dict_HLR['ConvBlockDepth'] = [3,3,3]
+    param_dict_HLR['GenPad'] = [128,128,128,128]
+    param_dict_HLR['ConvAct']=['relu','softplus','relu','softplus']
+    param_dict_HLR['DenseAct']=['tanh','tanh','tanh','tanh']
+    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
+    param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
     param_dict_HLR['id_pre'] = []
     # make sure "Weights" isn't actually in the id. it is just the identifier after all.
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['standard_per_batch','standard_per_batch','minmax_per_batch']
+    param_dict_HLR['ScalerType'] = ['standard_per_batch','standard_per_batch','minmax_per_batch','minmax_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         if len(param_dict_HLR['id_pre']) < len(param_dict_HLR['BatchSize']):
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_bag_conv_lstm_dense_tiny_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_bag_conv_lstm_nodense_medium_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -734,7 +748,7 @@ if __name__ == "__main__":
         # reference_bilstm outputs the 64-time-dist-dense unit.
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
 
-        lstm = reference_lstm_dense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_lstm_nodense_medium(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm)
 
