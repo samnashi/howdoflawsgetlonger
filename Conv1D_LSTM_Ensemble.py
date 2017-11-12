@@ -922,11 +922,16 @@ if __name__ == "__main__":
                                                  max_queue_size=test_array.shape[0], use_multiprocessing=False)
                 row_dict = {}
                 print("scores: {}".format(score))
+
+                #Metrics: ['loss', 'acc', 'mean_absolute_error', 'mean_absolute_percentage_error', 'mean_squared_error']
+                #for keys in model.metrics_names: #TODO: make the model read the metric names and have a dict as large as the metric names.
+
                 row_dict['filename'] = str(files[0])[:-4]
                 row_dict['loss'] = score[0]  # 'loss'
                 row_dict['acc'] = score[1]  # 'acc'
                 row_dict['mae'] = score[2]  # 'mean_absolute_error'
                 row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+                row_dict['mse'] = score[4]  # 'mean_absolute_percentage_error'
                 score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.
