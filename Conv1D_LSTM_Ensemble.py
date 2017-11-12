@@ -20,13 +20,6 @@ import json
 import scattergro_utils as sg_utils
 import sklearn.preprocessing
 
-
-# from LSTM_1D_ConvNet_Base import pair_generator_1dconv_lstm, conv_block_normal_param_count, conv_block_double_param_count, \
-#     conv_block_normal_param_count_narrow_window, conv_block_double_param_count_narrow_window,\
-#     conv_block_double_param_count_narrow_window_causal, conv_block_normal_param_count_narrow_window_causal, reference_bilstm
-
-# np.set_printoptions(threshold='nan')
-
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.currently set to 1d.'''
     output_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11,
@@ -90,14 +83,14 @@ def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1()
     out = k
     return out
 
-def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+def reference_lstm_nodense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+    h = LSTM(32, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp, stateful=sf)(input_tensor)
     i = BatchNormalization()(h)
-    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
+    j = LSTM(32, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf)(i)
     j = BatchNormalization()(j)
@@ -118,14 +111,14 @@ def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_
     out = j
     return out
 
-def reference_lstm_nodense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+def reference_lstm_nodense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = LSTM(32, kernel_initializer=k_init, return_sequences=True,
+    h = LSTM(200, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp, stateful=sf)(input_tensor)
     i = BatchNormalization()(h)
-    j = LSTM(32, kernel_initializer=k_init, return_sequences=True,
+    j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf)(i)
     j = BatchNormalization()(j)
@@ -140,38 +133,6 @@ def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(
                            implementation=imp, stateful=sf)(input_tensor)
     i = BatchNormalization()(h)
     j = LSTM(200, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp,stateful=sf)(i)
-    j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
-                              kernel_regularizer=k_reg))(j)
-    out = k
-    return out
-
-def reference_lstm_dense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
-    '''reference BiLSTM with batchnorm and elu TD-dense.
-    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp, stateful=sf)(input_tensor)
-    i = BatchNormalization()(h)
-    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp,stateful=sf)(i)
-    j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
-                              kernel_regularizer=k_reg))(j)
-    out = k
-    return out
-
-def reference_lstm_dense_huge(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
-    '''reference BiLSTM with batchnorm and elu TD-dense.
-    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = LSTM(400, kernel_initializer=k_init, return_sequences=True,
-                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
-                           implementation=imp, stateful=sf)(input_tensor)
-    i = BatchNormalization()(h)
-    j = LSTM(400, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf)(i)
     j = BatchNormalization()(j)
@@ -196,16 +157,53 @@ def reference_lstm_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_r
     out = k
     return out
 
-# ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
-def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
-    '''f means it's the normal param count branch'''
-    input_tensor = BatchNormalization()(input_tensor)
-    b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
-    c = BatchNormalization()(b)
-    d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
-    #g = BatchNormalization()(d)
-    #h = Dense(1, activation=dense_act)(g)
-    return d
+def reference_lstm_dense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(64, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_medium(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
+
+def reference_lstm_dense_huge(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(400, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    k = TimeDistributed(Dense(64, kernel_initializer=k_init, activation=dense_act,
+                              kernel_regularizer=k_reg))(j)
+    out = k
+    return out
 
 def reference_gru_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
     '''reference BiLSTM with batchnorm and elu TD-dense.
@@ -222,6 +220,17 @@ def reference_gru_dense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_re
                               kernel_regularizer=k_reg))(j)
     out = k
     return out
+
+# ---------------------REALLY WIDE WINDOW---------------------------------------------------------------------------------
+def conv_block_normal_param_count(input_tensor, conv_act='relu', dense_act='relu',k_reg=None,k_init='lecun_normal'):
+    '''f means it's the normal param count branch'''
+    input_tensor = BatchNormalization()(input_tensor)
+    b = Conv1D(8, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(input_tensor)
+    c = BatchNormalization()(b)
+    d = Conv1D(16, kernel_size=(65), padding='valid', activation=conv_act,kernel_regularizer=k_reg,kernel_initializer=k_init)(c)  # gives me 128x1
+    #g = BatchNormalization()(d)
+    #h = Dense(1, activation=dense_act)(g)
+    return d
 
 def conv_block_double_param_count(input_tensor, conv_act='relu', dense_act='relu',feature_weighting=4,k_reg=None,k_init='lecun_normal'):
     '''g means it's the output of the "twice the number of parameters"  branch'''
@@ -544,9 +553,9 @@ if __name__ == "__main__":
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         if len(param_dict_HLR['id_pre']) < len(param_dict_HLR['BatchSize']):
-            param_dict_HLR['id_pre'].append("HLR_" + str(z))
+            param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_bag_conv_lstm_nodense_tiny_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_bag_conv_lstm_dense_tiny_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -724,17 +733,11 @@ if __name__ == "__main__":
 
         # reference_bilstm outputs the 64-time-dist-dense unit.
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
-        # input_lstm = np.asarray([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11])
 
-        lstm = reference_lstm_nodense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_lstm_dense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm)
 
-        # lstm_out needs to go in.
-
-        #intermediate out should be the lstm's labels..
-
-        # define the model first
         tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11,lstm_out]
         g = concatenate(tensors_to_concat,name='concat_all')
         h = BatchNormalization()(g)
@@ -914,15 +917,7 @@ if __name__ == "__main__":
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                             scaler_type=active_scaler_type)
-                # for i in range(1):
-                #     X_test_batch, y_test_batch = test_generator.next()
-                #     # print(X_test_batch)
-                #     # print(y_test_batch)
-                #     if X_test_batch[0].shape[2] == 12:
-                #         print("12-col array detected. Cutting the 0th column.")
-                #         X_test_batch[0] = X_test_batch[0][:,:,1:]
-                #     score = model.predict_on_batch(X_test_batch)
-                    # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
+
                 score = model.evaluate_generator(test_generator, steps=(test_array.shape[0] // generator_batch_size),
                                                  max_queue_size=test_array.shape[0], use_multiprocessing=False)
                 row_dict = {}
@@ -935,6 +930,7 @@ if __name__ == "__main__":
                 score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.
+                # #initializing generator a second time, to save predictions.
                 test_generator = pair_generator_1dconv_lstm_bagged(test_array, label_array, start_at=0,
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
