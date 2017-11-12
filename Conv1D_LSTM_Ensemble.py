@@ -543,10 +543,10 @@ if __name__ == "__main__":
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
-        if len(param_dict_HLR['id_pre']) == 0:
+        if len(param_dict_HLR['id_pre']) < len(param_dict_HLR['BatchSize']):
             param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_bag_conv_lstm_nodense_micro_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_bag_conv_lstm_nodense_tiny_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -587,7 +587,7 @@ if __name__ == "__main__":
         num_sequence_draws = 800  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
-        test_only = True  # no training. if finetune is also on, this'll raise an error.
+        test_only = False  # no training. if finetune is also on, this'll raise an error.
         scaler_active = True
         use_precomp_sscaler = False
         active_scaler_type = st #no capitals!
@@ -726,7 +726,7 @@ if __name__ == "__main__":
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
         # input_lstm = np.asarray([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11])
 
-        lstm = reference_lstm_nodense_micro(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_lstm_nodense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm)
 
