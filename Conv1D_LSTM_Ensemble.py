@@ -118,6 +118,20 @@ def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_
     out = j
     return out
 
+def reference_lstm_nodense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
+    '''reference BiLSTM with batchnorm and elu TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = LSTM(32, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf)(input_tensor)
+    i = BatchNormalization()(h)
+    j = LSTM(32, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf)(i)
+    j = BatchNormalization()(j)
+    out = j
+    return out
+
 def reference_lstm_dense(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2, dense_act = 'tanh'):
     '''reference BiLSTM with batchnorm and elu TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
@@ -432,7 +446,10 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
         generator_batch_size_valid_x10 = generator_batch_size + generator_pad
         generator_batch_size_valid_x11 = generator_batch_size + generator_pad
 
-        x_lstm = data_scaled[:, index:index + generator_batch_size, :] #lstm's input.
+        if data_scaled.shape[2] > 11:
+            x_lstm = data_scaled[:, index:index + generator_batch_size, 1:]
+        if data_scaled.shape[2] == 11:
+            x_lstm = data_scaled[:, index:index + generator_batch_size, :] #lstm's input.
 
         x1 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x1, 0]),
                         newshape=(1, (generator_batch_size_valid_x1), 1))  # first dim = 0 doesn't work.
@@ -511,23 +528,25 @@ if __name__ == "__main__":
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
-    param_dict_HLR['BatchSize'] = [128,128,128,128]
-    param_dict_HLR['FeatWeight'] = [2,2,2,2]
+    param_dict_HLR['BatchSize'] = [128,128,128]
+    param_dict_HLR['FeatWeight'] = [2,2,2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-    param_dict_HLR['GenPad'] = [128,128,128,128]
-    param_dict_HLR['ConvAct']=['relu','relu','relu','softplus']
-    param_dict_HLR['DenseAct']=['tanh','tanh','tanh','tanh']
-    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
-    param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
-    param_dict_HLR['id_pre'] = [] #initialize to blank first
+    param_dict_HLR['GenPad'] = [128,128,128]
+    param_dict_HLR['ConvAct']=['relu','softplus','relu']
+    param_dict_HLR['DenseAct']=['tanh','tanh','tanh']
+    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2()]
+    param_dict_HLR['ConvBlockDepth'] = [3,3,3]
+    param_dict_HLR['id_pre'] = []
+    # make sure "Weights" isn't actually in the id. it is just the identifier after all.
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['robust_per_batch','standard_per_batch','minmax_per_batch','standard_per_batch']
+    param_dict_HLR['ScalerType'] = ['standard_per_batch','standard_per_batch','minmax_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
-        param_dict_HLR['id_pre'].append("HLR_" + str(z))
+        if len(param_dict_HLR['id_pre']) == 0:
+            param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_bag_conv_lstm_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_bag_conv_lstm_nodense_micro_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -546,6 +565,7 @@ if __name__ == "__main__":
 
     #check lengths after the idpre and idpost aren't blank anymore.
     for key in param_dict_HLR.keys():
+        print("checking key {}".format(key))
         assert(len(param_dict_HLR[key]) == len(param_dict_HLR['BatchSize']))
 
     for z in range(0, len(param_dict_HLR['BatchSize'])):
@@ -567,7 +587,7 @@ if __name__ == "__main__":
         num_sequence_draws = 800  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
-        test_only = False  # no training. if finetune is also on, this'll raise an error.
+        test_only = True  # no training. if finetune is also on, this'll raise an error.
         scaler_active = True
         use_precomp_sscaler = False
         active_scaler_type = st #no capitals!
@@ -706,7 +726,7 @@ if __name__ == "__main__":
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
         # input_lstm = np.asarray([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11])
 
-        lstm = reference_lstm_nodense(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_lstm_nodense_micro(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm)
 
@@ -725,11 +745,12 @@ if __name__ == "__main__":
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.005)
+        optimizer_used = rmsprop(lr=0.0059)
         # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
         # loss_weights = {'main_output': 1., 'aux_output': 0.2})
 
-        model.compile(loss={'combined_output': 'mape', 'lstm_output': 'mse'}, optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+        model.compile(loss={'combined_output': 'mape', 'lstm_output': 'mse'},
+                      optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
         print("Model summary: {}".format(model.summary()))
 
         print("Inputs: {}".format(model.input_shape))
@@ -789,8 +810,8 @@ if __name__ == "__main__":
 
                 nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 3)
                 shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
-                #active_starting_position = shuffled_starting_position #doesn't start from 0, if the model is still in the 1st phase of training
-                active_starting_position = 0
+                active_starting_position = shuffled_starting_position #doesn't start from 0, if the model is still in the 1st phase of training
+                #active_starting_position = 0
 
                 if adaptive_circumnav == True and i >= aux_circumnav_onset_draw:
                     active_seq_circumnav_amt = aux_seq_circumnav_amt
@@ -893,11 +914,14 @@ if __name__ == "__main__":
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
                                                             scaler_type=active_scaler_type)
-                for i in range(1):
-                    X_test_batch, y_test_batch = test_generator.next()
-                    # print(X_test_batch)
-                    # print(y_test_batch)
-                    score = model.predict_on_batch(X_test_batch)
+                # for i in range(1):
+                #     X_test_batch, y_test_batch = test_generator.next()
+                #     # print(X_test_batch)
+                #     # print(y_test_batch)
+                #     if X_test_batch[0].shape[2] == 12:
+                #         print("12-col array detected. Cutting the 0th column.")
+                #         X_test_batch[0] = X_test_batch[0][:,:,1:]
+                #     score = model.predict_on_batch(X_test_batch)
                     # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
                 score = model.evaluate_generator(test_generator, steps=(test_array.shape[0] // generator_batch_size),
                                                  max_queue_size=test_array.shape[0], use_multiprocessing=False)
@@ -923,12 +947,12 @@ if __name__ == "__main__":
 
                 while test_i <= prediction_length - generator_batch_size:
                     x_test_batch, y_test_batch = test_generator.next()
-                    x_prediction[0, test_i:test_i + generator_batch_size, :] = model.predict_on_batch(x_test_batch)
-                    y_prediction[0, test_i:test_i + generator_batch_size, :] = y_test_batch
+                    x_prediction[0, test_i:test_i + generator_batch_size, :] = model.predict_on_batch(x_test_batch)[0] #just the combined output
+                    y_prediction[0, test_i:test_i + generator_batch_size, :] = y_test_batch[0]
                     test_i += generator_batch_size
                 # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
                 if save_preds == True:
-                    np.save(Base_Path + 'preds_' + identifier_post_training + str(files[0]), arr=y_prediction)
+                    np.save(analysis_path + 'preds/preds_' + identifier_post_training + str(files[0]), arr=y_prediction)
 
                 # print(y_prediction.shape)
                 # print (x_prediction.shape)

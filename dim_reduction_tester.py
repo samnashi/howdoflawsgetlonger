@@ -75,7 +75,7 @@ for index_to_load in range(0,len(combined_filenames)):
         label_train_array = label_train_array[:,1:]
     identifier = files[0][:-4]
 
-    train_array=train_array[-10000:,:] #cut it short just to test
+    #train_array=train_array[-10000:,:] #cut it short just to test
 
     #KernelPCA, FastICA, FactorAnalysis, IncrementalPCA
 
@@ -103,7 +103,6 @@ for index_to_load in range(0,len(combined_filenames)):
     colnames.append(['explained_variance','explained_variance_ratio'])
     pca_combined_results_shape = (pca.components_.shape[0],(pca.components_.shape[1] + pca.explained_variance_.ndim
                                                             + pca.explained_variance_ratio_.ndim))
-
 
     pca_results_ndarray = np.ndarray(shape=pca_combined_results_shape)
     pca_results_ndarray[:, 0: pca.components_.shape[1]] = pca.components_
