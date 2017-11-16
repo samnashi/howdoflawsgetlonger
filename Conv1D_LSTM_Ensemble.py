@@ -112,7 +112,7 @@ def reference_lstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_
     return out
 
 def reference_lstm_nodense_medium(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf = False, imp = 2):
-    '''reference BiLSTM with batchnorm and elu TD-dense.
+    '''reference BiLSTM with batchnorm and NO dense layers. Output is already batch-normed.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = LSTM(100, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
@@ -569,7 +569,8 @@ if __name__ == "__main__":
         if len(param_dict_HLR['id_pre']) < len(param_dict_HLR['BatchSize']):
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_bag_conv_lstm_nodense_medium_shufstart_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        #bag_conv_lstm_nodense_medium_shufstart
+        id_post_temp = "_xgb_testmodel_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -607,7 +608,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 800  # how many times the training corpus is sampled.
+        num_sequence_draws = 10  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -620,7 +621,7 @@ if __name__ == "__main__":
         base_seq_circumnav_amt = 1.0 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 300
+            aux_circumnav_onset_draw = 5
             assert(aux_circumnav_onset_draw < num_sequence_draws)
             aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -851,14 +852,14 @@ if __name__ == "__main__":
                 print("fine-tuning/partial training session completed.")
                 weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
                 model.save_weights(weights_file_name)
-                model.save('./' + identifier_post_training + '.h5')
+                model.save('./model_' + identifier_post_training + '.h5')
                 print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                                  weights_file_name))
             if weights_present_indicator == False and finetune == False:  # fresh training
                 print("FRESH training session completed.")
                 weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
                 model.save_weights(weights_file_name)
-                model.save('./' + identifier_post_training + '.h5')
+                model.save('./model_' + identifier_post_training + '.h5')
                 print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                                  weights_file_name))
             else:  # TESTING ONLY! bypass weights present indicator.

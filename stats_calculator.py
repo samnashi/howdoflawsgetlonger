@@ -49,4 +49,6 @@ for index_to_load in range(0,2):
         print("skew {}".format(skewtest(label_train_array[:, col], axis=0)))
         print("normal {}".format(normaltest(label_train_array[:, col], axis=0)))
 
+        #TODO: cast each column into a dataframe row.
+
     

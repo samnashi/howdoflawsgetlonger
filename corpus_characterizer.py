@@ -17,6 +17,10 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 #THIS IS USED IN CHUNKER_TESTER
 def generator_chunker(array_raw, chunker_batch_size, start_at = 0,scaler_active=True,scaler_type='standard_per_batch'):
+    '''This is designed as a tool to ease comparisons between really large arrays.
+    Use case: define one generator to load and yield chunks of a prediction array,
+    then define another generator to load and yield chunks of the labels/targets.
+     Feed the results of both generator's .next() into a scikit-learn regression loss function.'''
     #find largest multiple of the batch size that'd go into the array. largest common multiple
     assert type(array_raw) == np.ndarray
     lcm = chunker_batch_size * (array_raw.shape[0] // chunker_batch_size)
