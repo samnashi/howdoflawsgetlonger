@@ -359,7 +359,7 @@ def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', d
 #TODO: separate label and data scalers!
 #TODO: copy the data array twice? or have two inputs. 
 def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type='standard',
-                               use_precomputed_coeffs=True,generator_pad = 128):  # shape is something like 1, 11520, 11
+                               use_precomputed_coeffs=True,generator_pad = 128, no_labels = False):  # shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -527,7 +527,8 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
         assert (x10.shape[1] == generator_batch_size_valid_x10)
         assert (x11.shape[1] == generator_batch_size_valid_x11)
         assert (y.shape[1] == generator_batch_size)
-        if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type):
+        if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type) \
+                and no_labels == False:
             # x1s = scaler.fit_transform(X=x1)
             # x2s = scaler.fit_transform(X=x2)
             # x3s = scaler.fit_transform(X=x3)
@@ -542,6 +543,9 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
             ys = label_scaler.fit_transform(X=np.reshape(y,newshape=(y.shape[1],y.shape[2]))) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
             y_re_exp = np.reshape(ys,newshape = (y.shape))
             yield ([x_lstm,x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], [y_re_exp,y_re_exp])
+        elif scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type) \
+                and no_labels == True:
+            yield ([x_lstm, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11])
         else:
             yield ([x_lstm, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], [y,y]) #two outputs, multiple inputs.
 
