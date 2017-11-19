@@ -81,7 +81,7 @@ def create_model_list():
     # load models
     model_filenames = list(set(os.listdir(models_path)))
     # print("before sorting, data_filenames: {}".format(data_filenames))
-    model_filenames.sort(reverse=True)
+    model_filenames.sort(reverse=False)
     # print("after sorting, data_filenames: {}".format(data_filenames))
 
     return model_filenames
@@ -166,16 +166,16 @@ if __name__ == "__main__":
                 # label_array_to_fit = label_scaler_aux_regressor.fit_transform(label_array[0:base_model_output_2d.shape[0],
                 #                                                               :])  # but this is scaling the whole label set, not per batch.
                 #aux_reg_regressor = Ridge()
-                aux_reg_regressor = LinearRegression()
+                #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
-                #aux_reg_regressor = ExtraTreesRegressor(n_estimators=4,criterion='mse',n_jobs=2,warm_start=True)
-                #aux_reg_regressor = RandomForestRegressor(n_estimators=4,criterion='mse',n_jobs=2,warm_start=True)
+                #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
+                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
                 
                 print("fitting regressor..")
                 aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
                 if isinstance(aux_reg_regressor,ExtraTreesRegressor) or isinstance(aux_reg_regressor,RandomForestRegressor):
                     tree_regressor_check_cond = True
-                if not isinstance(aux_reg_regressor,ExtraTreesRegressor) or not isinstance(aux_reg_regressor,RandomForestRegressor):
+                if not isinstance(aux_reg_regressor,ExtraTreesRegressor) and not isinstance(aux_reg_regressor,RandomForestRegressor):
                     tree_regressor_check_cond = False
 
                 # aux_reg_regressor_cached = Ridge()
@@ -263,9 +263,6 @@ if __name__ == "__main__":
                         test_label_array[label_batch_scaler_counter:label_batch_scaler_counter+GENERATOR_BATCH_SIZE,:])
                 label_batch_scaler_counter += GENERATOR_BATCH_SIZE
 
-
-
-
             print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d_test.shape,
                                                                                      batch_scaled_test_labels.shape))
             print("pretrained net's output shape: {}".format(base_model_output_2d_test.shape))
@@ -291,58 +288,8 @@ if __name__ == "__main__":
         mae_scores_df = pd.DataFrame.from_dict(mae_dict,orient='index')
         scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df,mse_scores_df,mae_scores_df]))
 
-        time_df.to_csv("./analysis/time_linreg_" + str(model) + ".csv")
-        r2_scores_df.to_csv("./analysis/r2_linreg_" + str(model) + ".csv")
-        mse_scores_df.to_csv("./analysis/mse_linreg_" + str(model) + ".csv")
-        mae_scores_df.to_csv("./analysis/mae_linreg_" + str(model) + ".csv")
-        scores_combined_df.to_csv("./analysis/combi_scores_linreg_" + str(model) + ".csv")
-
-
-
-        #aux_reg_regressor.score()
-        # training_hist = model.fit_generator(train_generator, steps_per_epoch=active_seq_circumnav_amt * (
-        # train_array.shape[0] // generator_batch_size),
-        #                                     epochs=num_epochs, verbose=2,
-        #                                     callbacks=[csv_logger, nan_terminator])
-
-
-        # aborted manual for for outer_counter in range (0,num_generator_yields):
-        #     for inner_counter in range(0,128):
-        #         generator_chunk
-
-    #set as feature extractor.
-    # g = concatenate(tensors_to_concat, name='concat_all')
-    # h = BatchNormalization()(g)
-    # i = Dense(64, activation=da, kernel_regularizer=kr, name='dense_post_concat')(h)
-
-    #need the entire loop for loading the dataset.
-
-
-    #initialize generator
-
-    #gen_chunk_features
-    #initialize xgboost
-    # specify parameters via map, definition are same as c++ version
-
-    #  #params as dicts?
-    # aux_reg_notscikit = xgb.XGBModel()
-    #
-    # #use the model as feature extractor
-
-    #
-    # aux_reg_regressor.fit()
-
-
-
-    #64-layer dense
-    #
-    # WAIT FOR THE NEW PARTIAL FIT API.
-    # aux_reg_input features = base_model.predict_on_batch(gen_chunk_features)
-    # dmatrix_input = xgb.DMatrix(gen_chunk_features)
-    # #set up the data DMatrix.
-    # #if counter == 1
-    # aux_reg_regressor_trained = aux_reg_regressor.fit()
-    # aux_reg_notscikit.fit()
-    #
-    # #postmortem
-    # aux_reg_regressor_trained
+        time_df.to_csv("./analysis/time_rf5_" + str(model) + ".csv")
+        r2_scores_df.to_csv("./analysis/r2_rf5_" + str(model) + ".csv")
+        mse_scores_df.to_csv("./analysis/mse_rf5_" + str(model) + ".csv")
+        mae_scores_df.to_csv("./analysis/mae_rf5_" + str(model) + ".csv")
+        scores_combined_df.to_csv("./analysis/combi_scores_rf5_" + str(model) + ".csv")
