@@ -106,16 +106,16 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
 num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
-num_sequence_draws = 1200 #how many times the training corpus is sampled.
+num_sequence_draws = 850 #how many times the training corpus is sampled.
 generator_batch_size = 128
 finetune = False
-test_only = True #no training. if finetune is also on, this'll raise an error.
+test_only = False #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
-sequence_circumnavigation_amt = 0.5
+sequence_circumnavigation_amt = 1.3
 save_preds = True
 save_figs = False
 identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
-identifier_post_training = "_small_l1_" #weight name to save as
+identifier_post_training = "_rerun_icacsis_l1l2_longer_" #weight name to save as
 # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
 image_path = "./images/"
@@ -164,15 +164,15 @@ print("after shuffling: {}".format(combined_filenames)) #shuffling works ok.
 #TODO boolean flags for retraining
 #TODO: check if model runs just fine with the batch norm layers
 a = Input(shape=(None,11))
-b = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1()))(a)
+b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2()))(a)
 b = BatchNormalization(name='bn_between_lstm')(b) #TODO: try all batchnorm on and fastmath is false
-c = Bidirectional(LSTM(128,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1()))(b)
+c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2()))(b)
 c = BatchNormalization(name='bn_after_last_lstm')(c)
-d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=l1()))(c)
+d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=l1_l2()))(c)
 d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
-keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
+keras_optimizer = rmsprop(lr=0.0025, rho=0.9, epsilon=1e-08, decay=0.0)
 model = Model(inputs=a,outputs=out)
 model.compile(loss='mse', optimizer=keras_optimizer,metrics=['accuracy','mae','mape','mse'])
 print("Model summary: {}".format(model.summary()))
@@ -375,7 +375,7 @@ if test_weights_present_indicator == True:
         y_prediction = y_prediction[::resample_interval, :]
 
     score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
-    score_df.to_csv('scores_lstm_' + identifier_post_training + '.csv')
+    score_df.to_csv('scores_lstm_rerun_' + identifier_post_training + '.csv')
 
         # y_pred = np.zeros(shape=(1,predictions_length,4))
         # y_true = np.zeros(shape=(1,predictions_length,4))

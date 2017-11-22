@@ -65,14 +65,14 @@ colnums_translator = ['percent_damage', 'delta_K_current_1', 'ctip_posn_curr_1',
                              'ctip_posn_curr_2', 'delta_K_current_3', 'ctip_posn_curr_3', 'delta_K_current_4',
                              'ctip_posn_curr_4', 'Load_1', 'Load_2']  # and seq_id,somehow
 
-for index_to_load in range(0, len(combined_test_filenames)):
-    files = combined_test_filenames[index_to_load]
+for index_to_load in range(0, len(combined_train_filenames)):
+    files = combined_train_filenames[index_to_load]
     print("files: {}".format(files))
-    test_seq_load_path = test_path + 'data/' + files[0]
-    test_label_load_path = test_path + 'label/' + files[1]
-    test_seq_temp = np.load(test_seq_load_path)
-    test_labels = np.load(test_label_load_path)
-    scipy_describe_result = describe(test_seq_temp,axis=0)
+    train_seq_load_path = train_path + 'data/' + files[0]
+    train_label_load_path = train_path + 'label/' + files[1]
+    train_seq_temp = np.load(train_seq_load_path)
+    train_labels = np.load(train_label_load_path)
+    scipy_describe_result = describe(train_seq_temp,axis=0)
     #print("train array col {}: {}".format(col,describe(train_array[:,col],axis=0)))
 
     #inner for: scaler types
@@ -82,14 +82,14 @@ for index_to_load in range(0, len(combined_test_filenames)):
         #instantiate generator, calculate for how long does the generator have to run
 
         gen_for_examination = \
-            pair_generator_1dconv_lstm_bagged(data=test_seq_temp,labels=test_labels,
+            pair_generator_1dconv_lstm_bagged(data=train_seq_temp,labels=train_labels,
                                               start_at = 0, use_precomputed_coeffs=False,scaler_type = scaler_type_to_test,
                                               generator_batch_size = 128,generator_pad = 128)
 
         #this is the use case for computing the per-batch statistics
-        remaining = CHUNKER_BATCH_SIZE * (test_seq_temp.shape[0] // CHUNKER_BATCH_SIZE)
+        remaining = CHUNKER_BATCH_SIZE * (train_seq_temp.shape[0] // CHUNKER_BATCH_SIZE)
         generator_yield_total = remaining #number of steps yielded.
-        num_cols = test_seq_temp.shape[1] #the number of columns in the features array.
+        num_cols = train_seq_temp.shape[1] #the number of columns in the features array.
 
         #there will be several final dataframes. Per-batch statistics, per-sequence-statistics.
         #1.
@@ -99,8 +99,8 @@ for index_to_load in range(0, len(combined_test_filenames)):
 
         #have a proxy method that determines the batch size before
 
-        temp_array_numrows = test_seq_temp.shape[0]
-        temp_array_numcols = 4 * test_seq_temp.shape[1] + test_seq_temp.shape[1]**2
+        temp_array_numrows = train_seq_temp.shape[0]
+        temp_array_numcols = 4 * train_seq_temp.shape[1] + train_seq_temp.shape[1]**2
 
         counter = 0
         while remaining > 0:
@@ -155,16 +155,16 @@ for index_to_load in range(0, len(combined_test_filenames)):
         batch_stats_dict[key] = chunk_ndarray_flattened
         #dict as pandas dataframe.
 
-test_describe_result_df = pd.DataFrame.from_dict(batch_stats_dict, orient='index')
+train_describe_result_df = pd.DataFrame.from_dict(batch_stats_dict, orient='index')
 #todo: wrong flatten direction.
 
 print("len(colnames): {} len(flattened): {} colnames_list: {}".format(len(colnames_list),chunk_ndarray_flattened.shape,colnames_list))
 #assert(len(colnames_list) == chunk_ndarray_flattened.shape[0])
 
-test_describe_result_df.to_csv(analysis_path + 'test_corpus_describe_result.csv',header=colnames_list)
+train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv',header=colnames_list)
 # except:
 #     print("writing the csv without headers.")
-#     test_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv')
+#     train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv')
 print('csv written.')
 
 
