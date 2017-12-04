@@ -359,7 +359,7 @@ def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', d
 #TODO: separate label and data scalers!
 #TODO: copy the data array twice? or have two inputs. 
 def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type='standard',
-                               use_precomputed_coeffs=True,generator_pad = 128, no_labels = False):  # shape is something like 1, 11520, 11
+                               use_precomputed_coeffs=True,generator_pad = 128, no_labels = False, label_dims = 4):  # shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -496,7 +496,11 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
                          newshape=(1, (generator_batch_size_valid_x10), 1))
         x11 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x11, 10]),
                          newshape=(1, (generator_batch_size_valid_x11), 1))
-        y = (labels_scaled[:, index:index + generator_batch_size, :])
+        if labels_scaled.shape[2] > label_dims:
+            #cut the step_index. it's like the sprue to ensure rigidity of data.
+            y = (labels_scaled[:, index:index + generator_batch_size, 1:])
+        if labels_scaled.shape[2] == label_dims:
+            y = (labels_scaled[:, index:index + generator_batch_size, :])
         # if generator won't yield the full batch in 3 iterations, then..
         if index + 3 * generator_batch_size < data_scaled.shape[1]:
             index = index + generator_batch_size
@@ -526,7 +530,7 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
         assert (x9.shape[1] == generator_batch_size_valid_x9)
         assert (x10.shape[1] == generator_batch_size_valid_x10)
         assert (x11.shape[1] == generator_batch_size_valid_x11)
-        assert (y.shape[1] == generator_batch_size)
+        assert (y.shape[1] == generator_batch_size) and y.shape[2] == label_dims
         if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type) \
                 and no_labels == False:
             # x1s = scaler.fit_transform(X=x1)
@@ -559,8 +563,8 @@ if __name__ == "__main__":
     param_dict_HLR['FeatWeight'] = [2,2,2,2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
     param_dict_HLR['GenPad'] = [128,128,128,128]
-    param_dict_HLR['ConvAct']=['relu','softplus','relu','softplus']
-    param_dict_HLR['DenseAct']=['tanh','tanh','tanh','tanh']
+    param_dict_HLR['ConvAct']=['relu','relu','relu','relu']
+    param_dict_HLR['DenseAct']=['sigmoid','tanh','sigmoid','tanh']
     param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
     param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
     param_dict_HLR['id_pre'] = []
@@ -574,7 +578,7 @@ if __name__ == "__main__":
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
         #bag_conv_lstm_nodense_medium_shufstart
-        id_post_temp = "_xgb_testmodel_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_tree_testmodel_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -611,8 +615,8 @@ if __name__ == "__main__":
 
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-        num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 10  # how many times the training corpus is sampled.
+        num_epochs = 4  # individual. like how many times is the net trained on that sequence consecutively
+        num_sequence_draws = 450  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -625,9 +629,9 @@ if __name__ == "__main__":
         base_seq_circumnav_amt = 1.0 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 5
+            aux_circumnav_onset_draw = 400
             assert(aux_circumnav_onset_draw < num_sequence_draws)
-            aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
+            aux_seq_circumnav_amt = 1.5 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
         save_preds = True
@@ -767,7 +771,8 @@ if __name__ == "__main__":
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.0059)
+        #optimizer_used = rmsprop(lr=0.0059)
+        optimizer_used = adam(lr=0.0085,decay=0.00001)
         # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
         # loss_weights = {'main_output': 1., 'aux_output': 0.2})
 

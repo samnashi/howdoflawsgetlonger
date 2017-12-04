@@ -303,7 +303,7 @@ def conv_block_double_param_count_narrow_window(input_tensor, conv_act='relu', d
 
 
 def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type='standard',
-                               use_precomputed_coeffs=True,generator_pad = 128):  # shape is something like 1, 11520, 11
+                               use_precomputed_coeffs=True,generator_pad = 128,label_dims = 4):  # shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -434,7 +434,13 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
                          newshape=(1, (generator_batch_size_valid_x10), 1))
         x11 = np.reshape((data_scaled[:, index:index + generator_batch_size_valid_x11, 10]),
                          newshape=(1, (generator_batch_size_valid_x11), 1))
-        y = (labels_scaled[:, index:index + generator_batch_size, :])
+        if labels_scaled.shape[2] > label_dims:
+            #cut the step_index. it's like the sprue to ensure rigidity of data.
+            y = (labels_scaled[:, index:index + generator_batch_size, 1:])
+        if labels_scaled.shape[2] == label_dims:
+            y = (labels_scaled[:, index:index + generator_batch_size, :])
+
+        # OLD y = (labels_scaled[:, index:index + generator_batch_size, :])
         # if generator won't yield the full batch in 3 iterations, then..
         if index + 3 * generator_batch_size < data_scaled.shape[1]:
             index = index + generator_batch_size
@@ -765,7 +771,7 @@ if __name__ == "__main__":
                 train_generator = pair_generator_1dconv_lstm(train_array, label_array, start_at=active_starting_position,
                                                              generator_batch_size=generator_batch_size,
                                                              use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
-                                                             scaler_type=active_scaler_type)
+                                                             scaler_type=active_scaler_type, label_dims=4)
                 training_hist = model.fit_generator(train_generator, steps_per_epoch=active_seq_circumnav_amt * (train_array.shape[0] // generator_batch_size),
                                                     epochs=num_epochs, verbose=2,
                                                     callbacks=[csv_logger, nan_terminator])
@@ -853,7 +859,7 @@ if __name__ == "__main__":
                 test_generator = pair_generator_1dconv_lstm(test_array, label_array, start_at=0,
                                                             generator_batch_size=generator_batch_size,
                                                             use_precomputed_coeffs=use_precomp_sscaler,scaled=scaler_active,
-                                                            scaler_type=active_scaler_type)
+                                                            scaler_type=active_scaler_type,label_dims=4)
                 for i in range(1):
                     X_test_batch, y_test_batch = test_generator.next()
                     # print(X_test_batch)

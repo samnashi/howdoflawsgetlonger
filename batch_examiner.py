@@ -63,16 +63,22 @@ batch_stats_dict = {}
 colnums_translator = ['percent_damage', 'delta_K_current_1', 'ctip_posn_curr_1',
                              'delta_K_current_2',
                              'ctip_posn_curr_2', 'delta_K_current_3', 'ctip_posn_curr_3', 'delta_K_current_4',
-                             'ctip_posn_curr_4', 'Load_1', 'Load_2']  # and seq_id,somehow
+                             'ctip_posn_curr_4', 'Load_1', 'Load_2','delta_a_current_1','delta_a_current_2','delta_a_current_3','delta_a_current_4']  # and seq_id,somehow
 
-for index_to_load in range(0, len(combined_train_filenames)):
-    files = combined_train_filenames[index_to_load]
+for index_to_load in range(0, len(combined_test_filenames)):
+    files = combined_test_filenames[index_to_load]
     print("files: {}".format(files))
-    train_seq_load_path = train_path + 'data/' + files[0]
-    train_label_load_path = train_path + 'label/' + files[1]
-    train_seq_temp = np.load(train_seq_load_path)
-    train_labels = np.load(train_label_load_path)
-    scipy_describe_result = describe(train_seq_temp,axis=0)
+    test_seq_load_path = test_path + 'data/' + files[0]
+    test_label_load_path = test_path + 'label/' + files[1]
+    test_seq_temp = np.load(test_seq_load_path)
+    test_labels = np.load(test_label_load_path)
+    print("data/label shape: {}, {}".format(test_seq_temp.shape,test_labels.shape))
+    # #create a combined array where seq_temp is appended to the labels.
+    combined_shape = (test_seq_temp.shape[0],test_seq_temp.shape[1] + test_labels.shape[1])
+    # combined_array = np.zeros(shape=combined_shape)
+    # combined_array[:,0:train_seq_temp.shape[1]] = train_seq_temp
+    # combined_array[:,train_seq_temp.shape[1]:combined_array.shape[1]] = train_labels
+
     #print("train array col {}: {}".format(col,describe(train_array[:,col],axis=0)))
 
     #inner for: scaler types
@@ -82,14 +88,14 @@ for index_to_load in range(0, len(combined_train_filenames)):
         #instantiate generator, calculate for how long does the generator have to run
 
         gen_for_examination = \
-            pair_generator_1dconv_lstm_bagged(data=train_seq_temp,labels=train_labels,
+            pair_generator_1dconv_lstm_bagged(data=test_seq_temp,labels=test_labels,
                                               start_at = 0, use_precomputed_coeffs=False,scaler_type = scaler_type_to_test,
-                                              generator_batch_size = 128,generator_pad = 128)
+                                              generator_batch_size = 128,generator_pad = 128,label_dims=4)
 
         #this is the use case for computing the per-batch statistics
-        remaining = CHUNKER_BATCH_SIZE * (train_seq_temp.shape[0] // CHUNKER_BATCH_SIZE)
+        remaining = CHUNKER_BATCH_SIZE * (test_seq_temp.shape[0] // CHUNKER_BATCH_SIZE)
         generator_yield_total = remaining #number of steps yielded.
-        num_cols = train_seq_temp.shape[1] #the number of columns in the features array.
+        num_cols = test_seq_temp.shape[1] + test_labels.shape[1]#the number of columns in the features array.
 
         #there will be several final dataframes. Per-batch statistics, per-sequence-statistics.
         #1.
@@ -99,8 +105,8 @@ for index_to_load in range(0, len(combined_train_filenames)):
 
         #have a proxy method that determines the batch size before
 
-        temp_array_numrows = train_seq_temp.shape[0]
-        temp_array_numcols = 4 * train_seq_temp.shape[1] + train_seq_temp.shape[1]**2
+        temp_array_numrows = test_seq_temp.shape[0] #just the number of rows
+        temp_array_numcols = 4 * combined_shape[1] + combined_shape[1]**2 #
 
         counter = 0
         while remaining > 0:
@@ -108,7 +114,23 @@ for index_to_load in range(0, len(combined_train_filenames)):
             #chunk_stats = describe chunk
             chunk = gen_for_examination.next()
             #need to reshape to a normal array. (get rid of the 1)
-            chunk_to_examine = np.reshape(chunk[0][0],newshape=(chunk[0][0].shape[1],chunk[0][0].shape[2]))
+            #this is the ENSEMBLE generator's chunk.
+            new_chunk_shape = (chunk[0][0].shape[1],chunk[0][0].shape[2] + chunk[1][0].shape[2])
+
+            #chunk to examine SHOULD BE ALL COLUMNS!! #EXAMINE WHY LABEL HAS 5 COLUMNS
+            data_chunk_to_examine = np.reshape(chunk[0][0],newshape=(chunk[0][0].shape[1],chunk[0][0].shape[2]))
+            #gets rid of the additional axis on the 1st output of the generator's data output
+            label_chunk_to_examine = np.reshape(chunk[1][0],newshape=(chunk[1][0].shape[1],chunk[1][0].shape[2]))
+
+            #combined shape explicitly declared; same in the 0th dimension but add the 1st dimensions up.
+            combined_chunk_to_examine_shape = (data_chunk_to_examine.shape[0],
+                                               data_chunk_to_examine.shape[1] + label_chunk_to_examine.shape[1])
+            chunk_to_examine = np.zeros(shape=combined_chunk_to_examine_shape)
+            chunk_to_examine[:,0:data_chunk_to_examine.shape[1]] = data_chunk_to_examine
+            chunk_to_examine[:,data_chunk_to_examine.shape[1]:] = label_chunk_to_examine
+
+            #get rid of the additional axis on the 1st output of the label part of the generator's output
+            # ; the two labels output by the generator are duplicates anyway
             chunk_describe_result = describe(chunk_to_examine,axis=0) #aka the lstm output.
 
             #chunk_stats_ndarray = dissect chunk_stats so it's saveable as a numpy array
@@ -136,7 +158,7 @@ for index_to_load in range(0, len(combined_train_filenames)):
                 for colnum in range(0,chunk_corrcoef.shape[1]):
                     colnames_list.append('corrcoef_r' + colnums_translator[rownum] + "_c" + colnums_translator[colnum])
             chunk_corrcoef_flattened = chunk_corrcoef.flatten()
-            chunk_ndarray = np.zeros(shape=(4 + 11,11))
+            chunk_ndarray = np.zeros(shape=(4 + chunk_to_examine.shape[1],chunk_to_examine.shape[1]))
 
             chunk_ndarray[0,:] = chunk_mean
             chunk_ndarray[1,:] = chunk_variance
@@ -161,7 +183,7 @@ train_describe_result_df = pd.DataFrame.from_dict(batch_stats_dict, orient='inde
 print("len(colnames): {} len(flattened): {} colnames_list: {}".format(len(colnames_list),chunk_ndarray_flattened.shape,colnames_list))
 #assert(len(colnames_list) == chunk_ndarray_flattened.shape[0])
 
-train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv',header=colnames_list)
+train_describe_result_df.to_csv(analysis_path + 'test_corpus_describe_result2.csv',header=colnames_list)
 # except:
 #     print("writing the csv without headers.")
 #     train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv')

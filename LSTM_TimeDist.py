@@ -24,7 +24,8 @@ from keras.callbacks import CSVLogger
 
 #you limit the # of calls keras calls the generator OUTSIDE the generator.
 #each time you fit, dataset length // batch size. round down!
-def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard', scale_what ='data',use_precomputed_coeffs = False): #shape is something like 1, 11520, 11
+def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard',
+                        scale_what ='data',use_precomputed_coeffs = False, label_dims = 4): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -80,7 +81,16 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         # create Numpy arrays of input data
         # and labels, from each line in the file
         x = (data_scaled[:, index:index + generator_batch_size, :])  # first dim = 0 doesn't work.
-        y = (labels_scaled[:, index:index + generator_batch_size, :])  # yield shape = (4,)
+
+        if labels_scaled.shape[2] > label_dims:
+            #cut the step_index. it's like the sprue to ensure rigidity of data.
+            y = (labels_scaled[:, index:index + generator_batch_size, 1:])
+        if labels_scaled.shape[2] == label_dims:
+            y = (labels_scaled[:, index:index + generator_batch_size, :])
+
+        # OLD y = (labels_scaled[:, index:index + generator_batch_size, :])  # yield shape = (4,)
+
+
         #generator_batch_size * (data_scaled.shape[1] - start_at) // generator_batch_size
         if index + 2 * generator_batch_size < data_scaled.shape[1]:
             index = index + generator_batch_size
@@ -105,17 +115,17 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
 
 #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-num_epochs = 2 #individual. like how many times is the net trained on that sequence consecutively
+num_epochs = 4 #individual. like how many times is the net trained on that sequence consecutively
 num_sequence_draws = 850 #how many times the training corpus is sampled.
 generator_batch_size = 128
 finetune = False
 test_only = False #no training. if finetune is also on, this'll raise an error.
 use_precomp_sscaler = True
-sequence_circumnavigation_amt = 1.3
+sequence_circumnavigation_amt = 1.5
 save_preds = True
 save_figs = False
 identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
-identifier_post_training = "_rerun_icacsis_l1l2_longer_" #weight name to save as
+identifier_post_training = "_test_safety_generator_" #weight name to save as
 # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
 image_path = "./images/"
@@ -172,7 +182,7 @@ d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(s
 d = BatchNormalization(name='bn_final')(d)
 out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
-keras_optimizer = rmsprop(lr=0.0025, rho=0.9, epsilon=1e-08, decay=0.0)
+keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
 model = Model(inputs=a,outputs=out)
 model.compile(loss='mse', optimizer=keras_optimizer,metrics=['accuracy','mae','mape','mse'])
 print("Model summary: {}".format(model.summary()))
@@ -222,7 +232,7 @@ if (finetune == False and weights_present_indicator == False and test_only == Fa
             model.load_weights(finetune_init_weights_filename, by_name=True)
 
         train_generator = pair_generator_lstm(train_array, label_array, start_at=shuffled_starting_position,
-                            generator_batch_size=generator_batch_size, use_precomputed_coeffs=False)
+                            generator_batch_size=generator_batch_size, use_precomputed_coeffs=False,label_dims=4)
 
         if i == 0 :
             training_hist = model.fit_generator(train_generator,epochs=num_epochs,
@@ -325,7 +335,7 @@ if test_weights_present_indicator == True:
         #largest integer multiple of the generator batch size that fits into the length of the sequence.
         #TODO update to new API regarding initialization of precomputed coeffs.
         test_generator = pair_generator_lstm(test_array, label_array, start_at = 0,
-                                             generator_batch_size=generator_batch_size, use_precomputed_coeffs = False)
+                                             generator_batch_size=generator_batch_size, use_precomputed_coeffs = False,label_dims=4)
         row_dict = {}
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
                                          max_queue_size=test_array.shape[0], use_multiprocessing=False)
