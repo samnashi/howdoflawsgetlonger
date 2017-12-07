@@ -29,25 +29,25 @@ def set_standalone_scaler_params(output_scaler):
     output_scaler.scale_ = [3.3846661598370483e-06, 3.4016400901868433e-06, 6.6294078690327e-06, 6.63076509642508e-06]
     return output_scaler
 
-def reference_bilstm_micro(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+def reference_bilstm_nodense_micro(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
     '''reference SMALL BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
-    h = Bidirectional(LSTM(16, kernel_initializer=k_init, return_sequences=True,
+    h = Bidirectional(LSTM(32, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(input_tensor)
     i = BatchNormalization()(h)
-    j = Bidirectional(LSTM(16, kernel_initializer=k_init, return_sequences=True,
+    j = Bidirectional(LSTM(32, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(i)
     j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
-                              kernel_regularizer=k_reg))(j)
+    # k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+    #                           kernel_regularizer=k_reg))(j)
     #l = BatchNormalization()(k)
     #out = Dense(4)(l)
-    out = k
+    out = j
     return out
 
-def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+def reference_bilstm_nodense_tiny(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
     '''reference SMALL BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
@@ -58,11 +58,29 @@ def reference_bilstm_small(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp,stateful=sf))(i)
     j = BatchNormalization()(j)
-    k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation=dense_act,
-                              kernel_regularizer=k_reg))(j)
+    # k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
+    #                           kernel_regularizer=k_reg))(j)
     #l = BatchNormalization()(k)
     #out = Dense(4)(l)
-    out = k
+    out = j
+    return out
+
+def reference_bilstm_nodense_medium(input_tensor,k_init=lecun_normal(seed=1337),k_reg=l1(), rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(100, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp,stateful=sf))(i)
+    j = BatchNormalization()(j)
+    # k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation=dense_act,
+    #                           kernel_regularizer=k_reg))(j)
+    #l = BatchNormalization()(k)
+    #out = Dense(4)(l)
+    out = j
     return out
 
 def reference_bilstm_big(input_tensor,k_init=lecun_normal(seed=1337), k_reg=l1(),rec_reg=l1(), sf = False,imp = 2, dense_act = 'tanh'):
@@ -578,7 +596,7 @@ if __name__ == "__main__":
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
         #bag_conv_lstm_nodense_medium_shufstart
-        id_post_temp = "_tree_testmodel_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_tree_mediumbidir_nodense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -616,7 +634,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 4  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 450  # how many times the training corpus is sampled.
+        num_sequence_draws = 500  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -757,22 +775,22 @@ if __name__ == "__main__":
         # reference_bilstm outputs the 64-time-dist-dense unit.
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
 
-        lstm = reference_lstm_nodense_medium(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_bilstm_nodense_medium(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
-        lstm_out = Dense(4,name='lstm_output')(lstm)
+        lstm_out = Dense(4,name='lstm_output')(lstm_bn)
 
-        tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11,lstm_out]
+        tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11,lstm_bn]
         g = concatenate(tensors_to_concat,name='concat_all')
         h = BatchNormalization()(g)
-        i = Dense(64,activation=da,kernel_regularizer=kr,name='dense_post_concat')(h)
+        i = Dense(128,activation=da,kernel_regularizer=kr,name='dense_post_concat')(h)
         j = BatchNormalization()(i)
         out = Dense(4,name='combined_output')(j)
 
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        #optimizer_used = rmsprop(lr=0.0059)
-        optimizer_used = adam(lr=0.0085,decay=0.00001)
+        optimizer_used = rmsprop(lr=0.0059)
+        #optimizer_used = adam(lr=0.0085,decay=0.00001)
         # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
         # loss_weights = {'main_output': 1., 'aux_output': 0.2})
 
