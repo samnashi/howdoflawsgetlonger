@@ -184,7 +184,8 @@ out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
 
 keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
 model = Model(inputs=a,outputs=out)
-model.compile(loss='mse', optimizer=keras_optimizer,metrics=['accuracy','mae','mape','mse'])
+metrics_list = ['mae', 'mape', 'mse', 'msle']
+model.compile(loss='mse', optimizer=keras_optimizer,metrics=metrics_list)
 print("Model summary: {}".format(model.summary()))
 print("Inputs: {}".format(model.input_shape))
 print ("Outputs: {}".format(model.output_shape))
@@ -340,11 +341,14 @@ if test_weights_present_indicator == True:
         score = model.evaluate_generator(test_generator, steps=(1 * test_array.shape[0] // generator_batch_size),
                                          max_queue_size=test_array.shape[0], use_multiprocessing=False)
         print("scores: {}".format(score))
+
+        #metrics=['accuracy','mae','mape','mse'])
         row_dict['filename'] = str(files[0])[:-4]
-        row_dict['loss'] = score[0] #'loss'
-        row_dict['acc'] = score[1] #'acc'
-        row_dict['mae'] =score[2] #'mean_absolute_error'
-        row_dict['mape'] = score[3] #'mean_absolute_percentage_error'
+        for item in metrics_list:
+            row_dict[str(item)] = score[metrics_list.index(item)] #'loss'
+        # row_dict['mae'] = score[1] #'acc'
+        # row_dict['mape'] =score[2] #'mean_absolute_error'
+        # row_dict['mse'] = score[3] #'mean_absolute_percentage_error'
         score_rows_list.append(row_dict)
 
         test_generator = pair_generator_lstm(test_array, label_array, start_at=0,
@@ -363,7 +367,7 @@ if test_weights_present_indicator == True:
             test_i += generator_batch_size
         # print("array shape {}".format(y_prediction[0,int(0.95*prediction_length), :].shape))
         if save_preds == True:
-            np.save(Base_Path + 'predictionbatch' + str(files[0]), arr=y_prediction)
+            np.save(Base_Path + 'preds_' + identifier_post_training + "_" + str(files[0]), arr=y_prediction)
 
         # print(y_prediction.shape)
         # print (x_prediction.shape)

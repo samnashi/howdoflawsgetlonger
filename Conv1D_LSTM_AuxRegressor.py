@@ -28,6 +28,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, median_abso
     r2_score
 from sklearn.kernel_ridge import KernelRidge
 import time
+from sklearn.externals import joblib
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
@@ -86,11 +87,31 @@ def create_model_list():
 
     return model_filenames
 
+def generate_model_id(model_sklearn):
+    # <class 'sklearn.ensemble.forest.RandomForestRegressor'>
+    # < class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
+    estim_num=0
+    model_type = ""
+    model_identifier = ""
+    if isinstance(model_sklearn, RandomForestRegressor):
+        model_type="rf"
+        dict = model_sklearn.get_params(deep=True)
+        estim_num=int(dict['n_estimators'])
+        model_type = model_type + str(estim_num)
+    if isinstance(model_sklearn, ExtraTreesRegressor):
+        model_type="et"
+        dict = model_sklearn.get_params(deep=True)
+        estim_num=int(dict['n_estimators'])
+        model_type = model_type + str(estim_num)
+    model_identifier = model_type
+    return str(model_identifier)
+
 if __name__ == "__main__":
 
-    num_sequence_draws = 300
+    num_sequence_draws = 5
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1 #because you gotta feed the base model the same way you fed it during training... (RNN commandments)
+    save_preds = True
 
     #create the data-pair filenames (using zip), use the helper methods
     train_set_filenames = create_training_set()
@@ -103,7 +124,8 @@ if __name__ == "__main__":
 
     # load model
     #identifier shouldn't have a leading underscore!
-    for model in model_filenames:
+    #TODO!!!!! REVERT BACK
+    for model in model_filenames[0:1]:
         identifier_post_training = model
         #identifier_post_training = "bag_conv_lstm_dense_tiny_shufstart_softplus_ca_tanh_da_3_cbd_standard_per_batch_sclr_l1l2_kr_HLR.h5"
         # './' + identifier_post_training + '.h5'
@@ -137,7 +159,7 @@ if __name__ == "__main__":
             base_model = Model(inputs=raw_base_model.input, outputs=raw_base_model.get_layer(name='dense_post_concat').output)
             base_model_output = base_model.predict_generator(aux_reg_train_generator,
                                                              steps=num_generator_yields)
-            print(type(base_model_output))
+            #print(type(base_model_output))
             print("base model output shape: {}".format(base_model_output.shape)) #1,128,64 (if steps=1) or
             # num_generator_yields,GENERATOR_BATCH_SIZE, num of neurons in dense_after_concat
             base_model_output_2d_shape = (base_model_output.shape[0] * base_model_output.shape[1], base_model_output.shape[2])
@@ -159,7 +181,7 @@ if __name__ == "__main__":
             #data_dmatrix = xgb.DMatrix(data=base_model_output_dmatrix) #input to the DMatrix has to be 2D. default is 3D.
             #label_array_reshaped = np.reshape(label_array,newshape=()) #reshape to what? it needed reshaping for the Keras LSTM.
             #label_dmatrix = xgb.DMatrix(data=label_array) #forget trying to get it through the generator.
-            print(type(base_model_output_2d), type(label_array))
+            #print(type(base_model_output_2d), type(label_array))
             print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d.shape, label_array.shape))
 
             if i == 0: #initialize for the first time
@@ -169,7 +191,7 @@ if __name__ == "__main__":
                 #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
                 #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
-                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
+                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True,oob_score=False)
                 
                 print("fitting regressor..")
                 aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
@@ -199,7 +221,7 @@ if __name__ == "__main__":
                 aux_reg_regressor.feature_importances_,aux_reg_regressor.estimators_,aux_reg_regressor.estimator_params))
 
         train_end_time = time.clock()
-        train_time_elapsed = train_start_time - train_end_time
+        train_time_elapsed = train_end_time - train_start_time
         print("training time elapsed: {}".format(train_time_elapsed))
         time_dict['train'] = train_time_elapsed
 
@@ -225,71 +247,101 @@ if __name__ == "__main__":
         mse_dict={}
         mae_dict={}
         test_start_time = time.clock()
-        for files in combined_filenames:
-            i += 1
-            data_load_path = test_path + '/data/' + files[0]
-            label_load_path = test_path + '/label/' + files[1]
-            # print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
-            test_array = np.load(data_load_path)
-            test_label_array = np.load(label_load_path)[:, 1:]
-            # --------COMMENTED OUT BECAUSE OF SCALER IN THE GENERATOR-----------------------------------
-            # test_array = np.reshape(test_array, (1, test_array.shape[0], test_array.shape[1]))
-            # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label doesn't need to be 3D
-            # print("file: {} data/label shape: {}, {}".format(files[0],test_array.shape, label_array.shape))
-            print(files[0])
-            # print("Metrics: {}".format(model.metrics_names))
-            # steps per epoch is how many times that generator is called
 
-            test_generator = pair_generator_1dconv_lstm_bagged(
-                test_array, test_label_array, start_at=0, generator_batch_size=GENERATOR_BATCH_SIZE,
-                use_precomputed_coeffs=False,
-                scaled=True, scaler_type='standard_per_batch',no_labels=True)
+    #try to save the trees attribute
+    model_id = generate_model_id(aux_reg_regressor)
+    print("aux_reg_regressor estimator_params", aux_reg_regressor.estimators_)
+    getparams_dict = aux_reg_regressor.get_params(deep=True)
+    print(getparams_dict)
+    getparams_df = pd.DataFrame.from_dict(data=getparams_dict,orient='index')
+    getparams_df.to_csv(analysis_path + model_id + str(model)[:-3] + "getparams.csv")
+    model_as_pkl_filename = analysis_path + model_id + str(model)[:-3] +".pkl"
+    joblib.dump(aux_reg_regressor,filename=model_as_pkl_filename)
+    #np.savetxt(analysis_path + "rf5getparams.txt",fmt='%s',X=str(aux_reg_regressor.get_params(deep=True)))
+    #np.savetxt(analysis_path + "rf5estimatorparams.txt",fmt='%s',X=aux_reg_regressor.estimator_params) USELESS
+    #np.savetxt(analysis_path + "rf5classes.txt",fmt='%s',X=aux_reg_regressor.classes_)
+    #np.savetxt(analysis_path + "rf5baseestim.txt",fmt='%s',X=aux_reg_regressor.base_estimator_)
 
-            num_generator_yields = test_array.shape[0]//GENERATOR_BATCH_SIZE
-            base_model_output_test = base_model.predict_generator(test_generator,
-                                                             steps=num_generator_yields)
-            base_model_output_2d_test_shape = (base_model_output_test.shape[0] * base_model_output_test.shape[1], base_model_output_test.shape[2])
-            base_model_output_2d_test = np.zeros(shape=base_model_output_2d_test_shape)
-            reshape_counter_test=0
-            for reshape_counter_test in range(0,base_model_output_test.shape[0]):
-                base_model_output_2d_test[reshape_counter_test:reshape_counter_test + GENERATOR_BATCH_SIZE, :] = np.reshape(
-                    base_model_output_test[reshape_counter_test,:,:],newshape=(GENERATOR_BATCH_SIZE,base_model_output_test.shape[2])) #1,128,64 to 128,64
-                reshape_counter_test += 1
+    #TODO: CHANGE THIS BACK!!
+    for files in combined_filenames[0:3]:
+        print("filename", files)
+        i += 1
+        data_load_path = test_path + '/data/' + files[0]
+        label_load_path = test_path + '/label/' + files[1]
+        # print("data/label load path: {} \n {}".format(data_load_path,label_load_path))
+        test_array = np.load(data_load_path)
+        test_label_array = np.load(label_load_path)[:, 1:]
+        # --------COMMENTED OUT BECAUSE OF SCALER IN THE GENERATOR-----------------------------------
+        # test_array = np.reshape(test_array, (1, test_array.shape[0], test_array.shape[1]))
+        # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label doesn't need to be 3D
+        # print("file: {} data/label shape: {}, {}".format(files[0],test_array.shape, label_array.shape))
+        print(files[0])
+        # print("Metrics: {}".format(model.metrics_names))
+        # steps per epoch is how many times that generator is called
 
-            batch_scaled_test_labels = np.zeros(shape=(test_label_array.shape))
-            for label_batch_scaler_counter in range(0,base_model_output_test.shape[0]): #how many batches there are
-                batch_scaled_test_labels[label_batch_scaler_counter:label_batch_scaler_counter+GENERATOR_BATCH_SIZE,:] = \
-                    label_scaler_aux_regressor.fit_transform(
-                        test_label_array[label_batch_scaler_counter:label_batch_scaler_counter+GENERATOR_BATCH_SIZE,:])
-                label_batch_scaler_counter += GENERATOR_BATCH_SIZE
+        test_generator = pair_generator_1dconv_lstm_bagged(
+            test_array, test_label_array, start_at=0, generator_batch_size=GENERATOR_BATCH_SIZE,
+            use_precomputed_coeffs=False,
+            scaled=True, scaler_type='standard_per_batch',no_labels=True)
 
-            print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d_test.shape,
-                                                                                     batch_scaled_test_labels.shape))
-            print("pretrained net's output shape: {}".format(base_model_output_2d_test.shape))
+        num_generator_yields = test_array.shape[0]//GENERATOR_BATCH_SIZE
+        base_model_output_test = base_model.predict_generator(test_generator,
+                                                         steps=num_generator_yields)
+        base_model_output_2d_test_shape = (base_model_output_test.shape[0] * base_model_output_test.shape[1], base_model_output_test.shape[2])
+        base_model_output_2d_test = np.zeros(shape=base_model_output_2d_test_shape)
+        reshape_counter_test=0
+        for reshape_counter_test in range(0,base_model_output_test.shape[0]):
+            base_model_output_2d_test[reshape_counter_test:reshape_counter_test + GENERATOR_BATCH_SIZE, :] = np.reshape(
+                base_model_output_test[reshape_counter_test,:,:],newshape=(GENERATOR_BATCH_SIZE,base_model_output_test.shape[2])) #1,128,64 to 128,64
+            reshape_counter_test += 1
 
-            #tested_regressor = pkl.loads(trained_regressor)
-            test_label_array_to_fit = batch_scaled_test_labels[0:base_model_output_2d_test.shape[0],:]
-            score = aux_reg_regressor.score(X=base_model_output_2d_test,y=test_label_array_to_fit)
-            print("score: {}".format(score))
-            scores_dict[str(files[0])] = score
-            preds = aux_reg_regressor.predict(base_model_output_2d_test)
-            mse_score = mean_squared_error(test_label_array_to_fit,preds)
-            mae_score = mean_absolute_error(test_label_array_to_fit,preds)
-            mse_dict[str(files[0])] = mse_score
-            mae_dict[str(files[0])] = mae_score
-        test_end_time = time.clock()
-        test_time_elapsed = test_end_time - test_start_time
-        print("test time elapsed: {}".format(test_time_elapsed))
-        time_dict['test_time'] = test_time_elapsed
+        batch_scaled_test_labels = np.zeros(shape=(test_label_array.shape))
+        for label_batch_scaler_counter in range(0,base_model_output_test.shape[0]): #how many batches there are
+            batch_scaled_test_labels[label_batch_scaler_counter:label_batch_scaler_counter+GENERATOR_BATCH_SIZE,:] = \
+                label_scaler_aux_regressor.fit_transform(
+                    test_label_array[label_batch_scaler_counter:label_batch_scaler_counter+GENERATOR_BATCH_SIZE,:])
+            label_batch_scaler_counter += GENERATOR_BATCH_SIZE
 
-        time_df = pd.DataFrame.from_dict(time_dict,orient='index')
-        r2_scores_df = pd.DataFrame.from_dict(scores_dict,orient='index')
-        mse_scores_df = pd.DataFrame.from_dict(mse_dict,orient='index')
-        mae_scores_df = pd.DataFrame.from_dict(mae_dict,orient='index')
-        scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df,mse_scores_df,mae_scores_df]))
+        print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d_test.shape,
+                                                                                 batch_scaled_test_labels.shape))
+        print("pretrained net's output shape: {}".format(base_model_output_2d_test.shape))
 
-        time_df.to_csv("./analysis/time_rf5_" + str(model) + ".csv")
-        r2_scores_df.to_csv("./analysis/r2_rf5_" + str(model) + ".csv")
-        mse_scores_df.to_csv("./analysis/mse_rf5_" + str(model) + ".csv")
-        mae_scores_df.to_csv("./analysis/mae_rf5_" + str(model) + ".csv")
-        scores_combined_df.to_csv("./analysis/combi_scores_rf5_" + str(model) + ".csv")
+        #tested_regressor = pkl.loads(trained_regressor)
+        test_label_array_to_fit = batch_scaled_test_labels[0:base_model_output_2d_test.shape[0],:]
+        score = aux_reg_regressor.score(X=base_model_output_2d_test,y=test_label_array_to_fit)
+        print("score: {}".format(score))
+        scores_dict[str(files[0])] = score
+        preds = aux_reg_regressor.predict(base_model_output_2d_test)
+        if  save_preds == True:
+            #<class 'sklearn.ensemble.forest.RandomForestRegressor'>
+            #< class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
+            preds_filename = analysis_path + "preds_" + model_id + "_" + str(files[0]) + "_" + str(model)[:-3]
+            np.save(file=preds_filename, arr=preds)
+        mse_score = mean_squared_error(test_label_array_to_fit,preds)
+        print("mse: {}".format(mse_score))
+        mae_score = mean_absolute_error(test_label_array_to_fit,preds)
+        print("mae: {}".format(mae_score))
+        mse_dict[str(files[0])] = mse_score
+        mae_dict[str(files[0])] = mae_score
+    test_end_time = time.clock()
+    test_time_elapsed = test_end_time - test_start_time
+    print("test time elapsed: {}".format(test_time_elapsed))
+    time_dict['test_time'] = test_time_elapsed
+
+    time_df = pd.DataFrame.from_dict(time_dict,orient='index')
+    #time_df.rename(columns=['time'])
+    r2_scores_df = pd.DataFrame.from_dict(scores_dict,orient='index')
+    #r2_scores_df.rename(columns=['r2'])
+    mse_scores_df = pd.DataFrame.from_dict(mse_dict,orient='index')
+    #mse_scores_df.rename(columns=['mse'])
+    mae_scores_df = pd.DataFrame.from_dict(mae_dict,orient='index')
+    #mae_scores_df.rename(columns=['mae'])
+    name_list = ['filename','r2','mse','mae']
+    scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df,mse_scores_df,mae_scores_df],axis=1))
+    scores_combined_df.set_axis(labels=name_list[1:], axis=1)
+
+    # time_df.to_csv("./analysis/time_rf5a_" + str(model) + ".csv")
+    # r2_scores_df.to_csv("./analysis/r2_rf5a_" + str(model) + ".csv")
+    # mse_scores_df.to_csv("./analysis/mse_rf5a_" + str(model) + ".csv")
+    # mae_scores_df.to_csv("./analysis/mae_rf5a_" + str(model) + ".csv")
+    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(model)[:-3] + ".csv")

@@ -583,7 +583,7 @@ if __name__ == "__main__":
     param_dict_HLR['GenPad'] = [128,128,128,128]
     param_dict_HLR['ConvAct']=['relu','relu','relu','relu']
     param_dict_HLR['DenseAct']=['sigmoid','tanh','sigmoid','tanh']
-    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
+    param_dict_HLR['KernelReg']=[l1(),l1_l2(),l1_l2(),l1_l2()]
     param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
     param_dict_HLR['id_pre'] = []
     # make sure "Weights" isn't actually in the id. it is just the identifier after all.
@@ -596,7 +596,7 @@ if __name__ == "__main__":
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
         #bag_conv_lstm_nodense_medium_shufstart
-        id_post_temp = "_tree_mediumbidir_nodense_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_tree_tinybidir_nodense_slowlr_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -634,7 +634,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 4  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 500  # how many times the training corpus is sampled.
+        num_sequence_draws = 300  # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -647,7 +647,7 @@ if __name__ == "__main__":
         base_seq_circumnav_amt = 1.0 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 400
+            aux_circumnav_onset_draw = 200
             assert(aux_circumnav_onset_draw < num_sequence_draws)
             aux_seq_circumnav_amt = 1.5 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -775,7 +775,7 @@ if __name__ == "__main__":
         # reference_bilstm outputs the 64-time-dist-dense unit.
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
 
-        lstm = reference_bilstm_nodense_medium(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_bilstm_nodense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm_bn)
 
@@ -789,13 +789,14 @@ if __name__ == "__main__":
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.0059)
+        optimizer_used = rmsprop(lr=0.0015)
         #optimizer_used = adam(lr=0.0085,decay=0.00001)
         # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
         # loss_weights = {'main_output': 1., 'aux_output': 0.2})
+        metrics_list = ['mae', 'mape', 'mse','msle']
 
         model.compile(loss={'combined_output': 'mape', 'lstm_output': 'mse'},
-                      optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+                      optimizer=optimizer_used, metrics=metrics_list)
         print("Model summary: {}".format(model.summary()))
 
         print("Inputs: {}".format(model.input_shape))

@@ -494,23 +494,23 @@ if __name__ == "__main__":
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
-    param_dict_HLR['BatchSize'] = [128,128]
-    param_dict_HLR['FeatWeight'] = [2,2]
+    param_dict_HLR['BatchSize'] = [128]
+    param_dict_HLR['FeatWeight'] = [2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
-    param_dict_HLR['GenPad'] = [128,128]
-    param_dict_HLR['ConvAct']=['elu','elu']
-    param_dict_HLR['DenseAct']=['tanh','tanh']
-    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2()]
-    param_dict_HLR['ConvBlockDepth'] = [3,3]
+    param_dict_HLR['GenPad'] = [128]
+    param_dict_HLR['ConvAct']=['elu']
+    param_dict_HLR['DenseAct']=['tanh']
+    param_dict_HLR['KernelReg']=[l1_l2()]
+    param_dict_HLR['ConvBlockDepth'] = [3]
     param_dict_HLR['id_pre'] = [] #initialize to blank first
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['robust_per_batch','standard_per_batch']
+    param_dict_HLR['ScalerType'] = ['robust_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_conv_micro_240dense_mse_highlr_0start_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_testnewadaptiveoutput_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -547,7 +547,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 600  # how many times the training corpus is sampled.
+        num_sequence_draws = 2 # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -560,7 +560,7 @@ if __name__ == "__main__":
         base_seq_circumnav_amt = 1.0 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 300
+            aux_circumnav_onset_draw = 1
             assert(aux_circumnav_onset_draw < num_sequence_draws)
             aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -696,7 +696,8 @@ if __name__ == "__main__":
         model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
         optimizer_used = rmsprop(lr=0.005)
-        model.compile(loss='mse', optimizer=optimizer_used, metrics=['accuracy', 'mae', 'mape', 'mse','msle'])
+        metrics_list = ['mae', 'mape', 'mse','msle']
+        model.compile(loss='mse', optimizer=optimizer_used, metrics=metrics_list)
         print("Model summary: {}".format(model.summary()))
 
         print("Inputs: {}".format(model.input_shape))
@@ -871,10 +872,12 @@ if __name__ == "__main__":
                 row_dict = {}
                 print("scores: {}".format(score))
                 row_dict['filename'] = str(files[0])[:-4]
-                row_dict['loss'] = score[0]  # 'loss'
-                row_dict['acc'] = score[1]  # 'acc'
-                row_dict['mae'] = score[2]  # 'mean_absolute_error'
-                row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+                for item in metrics_list:
+                    row_dict[str(item)] = score[metrics_list.index(item)]  # 'loss'
+                # row_dict['loss'] = score[0]  # 'loss'
+                # row_dict['acc'] = score[1]  # 'acc'
+                # row_dict['mae'] = score[2]  # 'mean_absolute_error'
+                # row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
                 score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.
