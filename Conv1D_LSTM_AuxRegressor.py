@@ -90,21 +90,32 @@ def create_model_list():
 def generate_model_id(model_sklearn):
     # <class 'sklearn.ensemble.forest.RandomForestRegressor'>
     # < class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
-    estim_num=0
+    estim_num = 0
     model_type = ""
     model_identifier = ""
     if isinstance(model_sklearn, RandomForestRegressor):
-        model_type="rf"
+        model_type = "rf"
         dict = model_sklearn.get_params(deep=True)
-        estim_num=int(dict['n_estimators'])
+        estim_num = int(dict['n_estimators'])
         model_type = model_type + str(estim_num)
     if isinstance(model_sklearn, ExtraTreesRegressor):
-        model_type="et"
+        model_type = "et"
         dict = model_sklearn.get_params(deep=True)
-        estim_num=int(dict['n_estimators'])
+        estim_num = int(dict['n_estimators'])
         model_type = model_type + str(estim_num)
-    model_identifier = model_type
+    if isinstance(model_sklearn, Ridge):
+        model_type = "ridge"
+        dict = model_sklearn.get_params(deep=True)
+        solver_type = str(dict['solver'])
+        model_type = model_type + solver_type
+    if isinstance(model_sklearn, LinearRegression):
+        model_type = "linreg"
+        dict = model_sklearn.get_params(deep=True)
+        solver_type = str(dict['solver'])
+        model_type = model_type + solver_type
+        model_identifier = model_type
     return str(model_identifier)
+
 
 if __name__ == "__main__":
 
@@ -263,7 +274,7 @@ if __name__ == "__main__":
     #np.savetxt(analysis_path + "rf5baseestim.txt",fmt='%s',X=aux_reg_regressor.base_estimator_)
 
     #TODO: CHANGE THIS BACK!!
-    for files in combined_filenames[0:3]:
+    for files in combined_filenames:
         print("filename", files)
         i += 1
         data_load_path = test_path + '/data/' + files[0]

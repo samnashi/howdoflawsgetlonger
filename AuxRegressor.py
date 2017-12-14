@@ -31,7 +31,6 @@ import time
 from sklearn.externals import joblib
 from sklearn.utils import check_array
 
-
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
 '''fits the scikit regressors only. required extensive work on making sure it works with the generator'''
@@ -45,14 +44,16 @@ analysis_path = "./analysis/"
 models_path = analysis_path + "models_to_load/"
 
 
-def mape(y_true, y_pred):
+def mape(y_true, y_pred, epsilon=1e-07):
     y_true, y_pred = check_array(y_true, y_pred)
 
     ## Note: does not handle mix 1d representation
-    #if _is_1d(y_true):
+    # if _is_1d(y_true):
     #    y_true, y_pred = _check_1d_array(y_true, y_pred)
+    diff = np.abs((y_true - y_pred) / np.clip(np.abs(y_true),epsilon,None))
 
-    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    return 100. * np.mean(diff, axis=-1)
+
 
 def create_training_set():
     '''loads the input features and the labels, returns a list'''
@@ -125,13 +126,18 @@ def generate_model_id(model_sklearn):
         dict = model_sklearn.get_params(deep=True)
         solver_type = str(dict['solver'])
         model_type = model_type + solver_type
-    model_identifier = model_type
+    if isinstance(model_sklearn, LinearRegression):
+        model_type = "linreg"
+        dict = model_sklearn.get_params(deep=True)
+        solver_type = str(dict['solver'])
+        model_type = model_type + solver_type
+        model_identifier = model_type
     return str(model_identifier)
 
 
 if __name__ == "__main__":
 
-    num_sequence_draws = 50
+    num_sequence_draws = 100
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1  # because you gotta feed the base model the same way you fed it during training... (RNN commandments)
     save_preds = True
@@ -147,14 +153,14 @@ if __name__ == "__main__":
     # load model
     # identifier shouldn't have a leading underscore!
     # TODO!!!!! REVERT BACK
-    #for model in model_filenames[0:1]:
+    # for model in model_filenames[0:1]:
 
     label_scaler_aux_regressor = StandardScaler()
     input_scaler_aux_regressor = StandardScaler()
     train_start_time = time.clock()
     tree_regressor_check_cond = False
     time_dict = {}
-    #batch_pointer = 0
+    # batch_pointer = 0
     for i in range(0, num_sequence_draws):
         index_to_load = np.random.randint(0, len(train_set_filenames))  # switch to iterations
         files = train_set_filenames[index_to_load]
@@ -172,8 +178,8 @@ if __name__ == "__main__":
         # batch_pointer += GENERATOR_BATCH_SIZE
         # train_array_to_scale = train_array[batch_pointer:batch_pointer + GENERATOR_BATCH_SIZE, :]
         # train_array_scaled = input_scaler_aux_regressor.fit_transform(X=train_array_to_scale)
-        
-        batch_scaled_inputs = np.zeros(shape=(train_array.shape))#TODO CHECK THE // GENERATOR_BATCH_SIZE part
+
+        batch_scaled_inputs = np.zeros(shape=(train_array.shape))  # TODO CHECK THE // GENERATOR_BATCH_SIZE part
         for train_batch_scaler_counter in range(0, train_array.shape[0]):  # how many batches there are
             batch_scaled_inputs[train_batch_scaler_counter:train_batch_scaler_counter + GENERATOR_BATCH_SIZE, :] = \
                 input_scaler_aux_regressor.fit_transform(
@@ -182,7 +188,7 @@ if __name__ == "__main__":
         train_array_to_fit = batch_scaled_inputs[0:train_array.shape[0], :]
 
         # batch-scale the target array. per batch size.
-        batch_scaled_labels = np.zeros(shape=(label_array.shape)) #TODO CHECK THE // GENERATOR_BATCH_SIZE part
+        batch_scaled_labels = np.zeros(shape=(label_array.shape))  # TODO CHECK THE // GENERATOR_BATCH_SIZE part
         for label_batch_scaler_counter in range(0, label_array.shape[0]):  # how many batches there are
             batch_scaled_labels[label_batch_scaler_counter:label_batch_scaler_counter + GENERATOR_BATCH_SIZE, :] = \
                 label_scaler_aux_regressor.fit_transform(
@@ -195,11 +201,11 @@ if __name__ == "__main__":
         if i == 0:  # initialize for the first time
             # label_array_to_fit = label_scaler_aux_regressor.fit_transform(label_array[0:base_model_output_2d.shape[0],
             #                                                               :])  # but this is scaling the whole label set, not per batch.
-            aux_reg_regressor = Ridge(solver='cholesky') #'svd' 'cholesky'(done) #'sparse_cg' #'lsqr' #'sag' #'saga'
-            # aux_reg_regressor = LinearRegression()
+            # aux_reg_regressor = Ridge(solver='cholesky') #'svd'(in progress) 'cholesky'(done) #'sparse_cg' #'lsqr'(inprog) #'sag'(inprog) #'saga'(inprog)
+            aux_reg_regressor = LinearRegression(n_jobs=-1)
             # aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
-            #aux_reg_regressor = ExtraTreesRegressor(n_estimators=10,criterion='mse',n_jobs=-1,warm_start=True)
-            #aux_reg_regressor = RandomForestRegressor(n_estimators=10, criterion='mse', n_jobs=-1, warm_start=True)
+            # aux_reg_regressor = ExtraTreesRegressor(n_estimators=30,criterion='mse',n_jobs=-1,warm_start=True)
+            # aux_reg_regressor = RandomForestRegressor(n_estimators=30, criterion='mse', n_jobs=-1, warm_start=True)
 
             print("fitting regressor..")
             aux_reg_regressor.fit(X=train_array_to_fit, y=label_array_to_fit)
@@ -291,7 +297,7 @@ if __name__ == "__main__":
         # print("Metrics: {}".format(model.metrics_names))
         # steps per epoch is how many times that generator is called
 
-        batch_scaled_inputs = np.zeros(shape=(test_array.shape))#TODO CHECK THE // GENERATOR_BATCH_SIZE part
+        batch_scaled_inputs = np.zeros(shape=(test_array.shape))  # TODO CHECK THE // GENERATOR_BATCH_SIZE part
         for test_batch_scaler_counter in range(0, test_array.shape[0]):  # how many batches there are
             batch_scaled_inputs[test_batch_scaler_counter:test_batch_scaler_counter + GENERATOR_BATCH_SIZE, :] = \
                 input_scaler_aux_regressor.fit_transform(
@@ -323,11 +329,11 @@ if __name__ == "__main__":
         mse_score = mean_squared_error(test_label_array_to_fit, preds)
         print("mse: {}".format(mse_score))
         mae_score = mean_absolute_error(test_label_array_to_fit, preds)
-        mape_score = mape(test_label_array_to_fit, preds)
+        # mape_score = mape(test_label_array_to_fit, preds)
         print("mae: {}".format(mae_score))
         mse_dict[str(files[0])] = mse_score
         mae_dict[str(files[0])] = mae_score
-        mape_dict[str(files[0])] = mape_score
+        # mape_dict[str(files[0])] = mape_score
     test_end_time = time.clock()
     test_time_elapsed = test_end_time - test_start_time
     print("test time elapsed: {}".format(test_time_elapsed))
@@ -341,10 +347,11 @@ if __name__ == "__main__":
     # mse_scores_df.rename(columns=['mse'])
     mae_scores_df = pd.DataFrame.from_dict(mae_dict, orient='index')
     # mae_scores_df.rename(columns=['mae'])
-    mape_scores_df = pd.DataFrame.from_dict(mape_dict, orient = 'index')
+    # mape_scores_df = pd.DataFrame.from_dict(mape_dict, orient = 'index')
 
-    name_list = ['filename', 'r2', 'mse', 'mae','mape']
-    scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df, mse_scores_df, mae_scores_df,mape_scores_df], axis=1))
+    name_list = ['filename', 'r2', 'mse', 'mae']
+
+    scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df, mse_scores_df, mae_scores_df], axis=1))
     scores_combined_df.set_axis(labels=name_list[1:], axis=1)
 
     # time_df.to_csv("./analysis/time_rf5a_" + str(model) + ".csv")
