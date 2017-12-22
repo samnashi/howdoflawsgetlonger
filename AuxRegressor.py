@@ -33,7 +33,8 @@ from sklearn.utils import check_array
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
-'''fits the scikit regressors only. required extensive work on making sure it works with the generator'''
+'''this fits the scikit regressors. no ensembling'''
+#TODO: make this loop through hyperparameters?
 
 # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"

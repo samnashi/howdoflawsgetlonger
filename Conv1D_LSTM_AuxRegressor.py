@@ -32,6 +32,9 @@ from sklearn.externals import joblib
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
+'''This loads a saved Keras model and uses it as a feature extractor, which then feeds into Scikit-learn multivariate regressors. 
+The generators created need to match what the Keras model asks for.'''
+
 # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 Base_Path = "./"
 image_path = "./images/"

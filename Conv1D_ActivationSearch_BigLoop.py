@@ -20,6 +20,7 @@ import json
 import scattergro_utils as sg_utils
 import sklearn.preprocessing
 
+'''This is the 1D ConvNet only script. This has the custom padding generator needed for the valid 1D convolutions.'''
 
 # from LSTM_1D_ConvNet_Base import pair_generator_1dconv_lstm, conv_block_normal_param_count, conv_block_double_param_count, \
 #     conv_block_normal_param_count_narrow_window, conv_block_double_param_count_narrow_window,\
@@ -489,8 +490,8 @@ def pair_generator_1dconv_lstm(data, labels, start_at=0, generator_batch_size=64
         else:
             yield ([x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], y)
 
-
 if __name__ == "__main__":
+
     param_dict_HLR = param_dict_MLR = param_dict_LLR = {} #initialize all 3 as blank dicts
     param_dict_list = []
 
@@ -689,7 +690,7 @@ if __name__ == "__main__":
         tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
         g = concatenate(tensors_to_concat)
         h = BatchNormalization()(g)
-        i = Dense(240,activation=da,kernel_regularizer=kr)(h)
+        i = Dense(240,activation=da,kernel_regularizer=kr,name='dense_post_concat')(h)
         j = BatchNormalization()(i)
         out = Dense(4)(j)
 
@@ -869,15 +870,15 @@ if __name__ == "__main__":
                     # print("Score: {}".format(score)) #test_array.shape[1]//generator_batch_size
                 score = model.evaluate_generator(test_generator, steps=(test_array.shape[0] // generator_batch_size),
                                                  max_queue_size=test_array.shape[0], use_multiprocessing=False)
+
                 row_dict = {}
                 print("scores: {}".format(score))
+                metrics_check = (metrics_list == model.metrics_names)
+                if metrics_check == False:
+                    metrics_list = model.metrics_names
                 row_dict['filename'] = str(files[0])[:-4]
                 for item in metrics_list:
-                    row_dict[str(item)] = score[metrics_list.index(item)]  # 'loss'
-                # row_dict['loss'] = score[0]  # 'loss'
-                # row_dict['acc'] = score[1]  # 'acc'
-                # row_dict['mae'] = score[2]  # 'mean_absolute_error'
-                # row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+                    row_dict[str(item)] = score[metrics_list.index(item)]
                 score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.

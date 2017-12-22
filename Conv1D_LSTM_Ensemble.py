@@ -20,6 +20,11 @@ import json
 import scattergro_utils as sg_utils
 import sklearn.preprocessing
 
+'''This is the 1D ConvNet + RNN script with harness. The two are bagged, with dual-loss-functions but trained end-to-end.
+This has the dual generator that yields the duplicated outputs, and applies the same scaler into the padded (ConvNet) and 
+normal (RNN) inputs.'''
+
+
 def set_standalone_scaler_params(output_scaler):
     '''intended to scale the output of the model to the same scaler as during training.currently set to 1d.'''
     output_scaler.var_ = [1.1455965013546072e-11, 1.1571155303166357e-11, 4.3949048693992676e-11,
@@ -966,16 +971,21 @@ if __name__ == "__main__":
                 row_dict = {}
                 print("scores: {}".format(score))
 
-                #Metrics: ['loss', 'acc', 'mean_absolute_error', 'mean_absolute_percentage_error', 'mean_squared_error']
-                #for keys in model.metrics_names: #TODO: make the model read the metric names and have a dict as large as the metric names.
+                metrics_check = (metrics_list == model.metrics_names)
+                if metrics_check == False:
+                    metrics_list = model.metrics_names
 
                 row_dict['filename'] = str(files[0])[:-4]
-                row_dict['loss'] = score[0]  # 'loss'
-                row_dict['acc'] = score[1]  # 'acc'
-                row_dict['mae'] = score[2]  # 'mean_absolute_error'
-                row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
-                row_dict['mse'] = score[4]  # 'mean_absolute_percentage_error'
+                for item in metrics_list:
+                    row_dict[str(item)] = score[metrics_list.index(item)]  # 'loss'
                 score_rows_list.append(row_dict)
+                # row_dict['filename'] = str(files[0])[:-4] DEPRECATED
+                # row_dict['loss'] = score[0]  # 'loss'
+                # row_dict['acc'] = score[1]  # 'acc'
+                # row_dict['mae'] = score[2]  # 'mean_absolute_error'
+                # row_dict['mape'] = score[3]  # 'mean_absolute_percentage_error'
+                # row_dict['mse'] = score[4]  # 'mean_absolute_percentage_error'
+                # score_rows_list.append(row_dict)
 
                 # testing should start at 0. For now.
                 # #initializing generator a second time, to save predictions.
