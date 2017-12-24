@@ -556,17 +556,33 @@ def pair_generator_1dconv_lstm_bagged(data, labels, start_at=0, generator_batch_
         assert (y.shape[1] == generator_batch_size) and y.shape[2] == label_dims
         if scaler_type == "standard_per_batch" or scaler_type == "minmax_per_batch" or ("_per_batch" in scaler_type) \
                 and no_labels == False:
-            # x1s = scaler.fit_transform(X=x1)
-            # x2s = scaler.fit_transform(X=x2)
-            # x3s = scaler.fit_transform(X=x3)
-            # x4s = scaler.fit_transform(X=x4)
-            # x5s = scaler.fit_transform(X=x5)
-            # x6s = scaler.fit_transform(X=x6)
-            # x7s = scaler.fit_transform(X=x7)
-            # x8s = scaler.fit_transform(X=x8)
-            # x9s = scaler.fit_transform(X=x9)
-            # x10s = scaler.fit_transform(X=x10)
-            # x11s = scaler.fit_transform(X=x11)
+            #sklearn needs 2D array input.. so first run fit_transform on the 2D array
+            x1s = scaler.fit_transform(X=np.reshape(x1,newshape=(x1.shape[1],x1.shape[2])))
+            x2s = scaler.fit_transform(X=np.reshape(x2,newshape=(x2.shape[1],x2.shape[2])))
+            x3s = scaler.fit_transform(X=np.reshape(x3,newshape=(x3.shape[1],x3.shape[2])))
+            x4s = scaler.fit_transform(X=np.reshape(x4,newshape=(x4.shape[1],x4.shape[2])))
+            x5s = scaler.fit_transform(X=np.reshape(x5,newshape=(x5.shape[1],x5.shape[2])))
+            x6s = scaler.fit_transform(X=np.reshape(x6,newshape=(x6.shape[1],x6.shape[2])))
+            x7s = scaler.fit_transform(X=np.reshape(x7,newshape=(x7.shape[1],x7.shape[2])))
+            x8s = scaler.fit_transform(X=np.reshape(x8,newshape=(x8.shape[1],x8.shape[2])))
+            x9s = scaler.fit_transform(X=np.reshape(x9,newshape=(x9.shape[1],x9.shape[2])))
+            x10s = scaler.fit_transform(X=np.reshape(x10,newshape=(x10.shape[1],x10.shape[2])))
+            x11s = scaler.fit_transform(X=np.reshape(x11,newshape=(x11.shape[1],x11.shape[2])))
+            x_lstm_s = scaler.fit_transform(X=np.reshape(x_lstm,newshape=(x_lstm.shape[1],x_lstm.shape[2])))
+            #then transform the fitted array to the
+            x1 = np.reshape(x1s,newshape=x1.shape)
+            x2 = np.reshape(x2s, newshape=x2.shape)
+            x3 = np.reshape(x3s, newshape=x3.shape)
+            x4 = np.reshape(x4s, newshape=x4.shape)
+            x5 = np.reshape(x5s, newshape=x5.shape)
+            x6 = np.reshape(x6s, newshape=x6.shape)
+            x7 = np.reshape(x7s, newshape=x7.shape)
+            x8 = np.reshape(x8s, newshape=x8.shape)
+            x9 = np.reshape(x9s, newshape=x9.shape)
+            x10 = np.reshape(x10s, newshape=x10.shape)
+            x11 = np.reshape(x11s, newshape=x11.shape)
+            x_lstm = np.reshape(x_lstm_s, newshape=x_lstm.shape)
+
             ys = label_scaler.fit_transform(X=np.reshape(y,newshape=(y.shape[1],y.shape[2]))) #this is what's actually needed. you can't add a batchnorm layer to labels in Keras.
             y_re_exp = np.reshape(ys,newshape = (y.shape))
             yield ([x_lstm,x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11], [y_re_exp,y_re_exp])
@@ -588,12 +604,12 @@ if __name__ == "__main__":
     param_dict_HLR['GenPad'] = [128,128,128,128]
     param_dict_HLR['ConvAct']=['relu','relu','relu','relu']
     param_dict_HLR['DenseAct']=['sigmoid','tanh','sigmoid','tanh']
-    param_dict_HLR['KernelReg']=[l1(),l1_l2(),l1_l2(),l1_l2()]
+    param_dict_HLR['KernelReg']=[l1_l2(),l1_l2(),l1_l2(),l1_l2()]
     param_dict_HLR['ConvBlockDepth'] = [3,3,3,3]
     param_dict_HLR['id_pre'] = []
     # make sure "Weights" isn't actually in the id. it is just the identifier after all.
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['standard_per_batch','standard_per_batch','minmax_per_batch','minmax_per_batch']
+    param_dict_HLR['ScalerType'] = ['standard_per_batch','standard_per_batch','robust_per_batch','robust_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
@@ -601,7 +617,7 @@ if __name__ == "__main__":
             param_dict_HLR['id_pre'].append("HLR_" + str(z)) #just a placeholder
         #ca = conv activation, da = dense activation, cbd = conv block depth
         #bag_conv_lstm_nodense_medium_shufstart
-        id_post_temp = "_tree_tinybidir_nodense_slowlr_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_tree_tinybidir_fv1c_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -884,15 +900,15 @@ if __name__ == "__main__":
             if weights_present_indicator == True and finetune == True:
                 print("fine-tuning/partial training session completed.")
                 weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
-                model.save_weights(weights_file_name)
-                model.save('./model_' + identifier_post_training + '.h5')
+                model.save_weights(analysis_path + weights_file_name)
+                model.save(analysis_path + 'model_' + identifier_post_training + '.h5')
                 print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                                  weights_file_name))
             if weights_present_indicator == False and finetune == False:  # fresh training
                 print("FRESH training session completed.")
                 weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
                 model.save_weights(weights_file_name)
-                model.save('./model_' + identifier_post_training + '.h5')
+                model.save(analysis_path + 'model_' + identifier_post_training + '.h5')
                 print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                                  weights_file_name))
             else:  # TESTING ONLY! bypass weights present indicator.
@@ -975,7 +991,7 @@ if __name__ == "__main__":
                 if metrics_check == False:
                     metrics_list = model.metrics_names
 
-                row_dict['filename'] = str(files[0])[:-4]
+                row_dict['seq_name'] = str(files[0])[:-4]
                 for item in metrics_list:
                     row_dict[str(item)] = score[metrics_list.index(item)]  # 'loss'
                 score_rows_list.append(row_dict)

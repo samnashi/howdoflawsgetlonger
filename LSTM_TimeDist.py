@@ -30,7 +30,7 @@ from keras.callbacks import CSVLogger
 #each time you fit, dataset length // batch size. round down!
 
 def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scaled=True, scaler_type ='standard',
-                        scale_what ='data',use_precomputed_coeffs = False, label_dims = 4): #shape is something like 1, 11520, 11
+                        scale_what ='data',use_precomputed_coeffs = False, label_dims = 4, no_labels=False): #shape is something like 1, 11520, 11
     '''Custom batch-yielding generator for Scattergro Output. You need to feed it the numpy array after running "Parse_Individual_Arrays script
     data and labels are self-explanatory.
     Parameters:
@@ -116,7 +116,10 @@ def pair_generator_lstm(data, labels, start_at=0, generator_batch_size=64, scale
         # if (x.shape[1] != generator_batch_size and y.shape[1] != generator_batch_size): raise StopIteration
         assert(x.shape[1]==generator_batch_size)
         # assert(y.shape[1]==generator_batch_size)
-        yield (x, y)
+        if no_labels == False:
+            yield (x, y)
+        if no_labels == True:
+            yield(x)
 
 
 def reference_bilstm_nodense_micro(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf=False,
@@ -245,7 +248,7 @@ if __name__ == "__main__":
     #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 400 #how many times the training corpus is sampled.
+    num_sequence_draws = 100 #how many times the training corpus is sampled.
     generator_batch_size = 128
     finetune = False
     test_only = False #no training. if finetune is also on, this'll raise an error.
@@ -254,7 +257,7 @@ if __name__ == "__main__":
     save_preds = True
     save_figs = False
     identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
-    identifier_post_training = "_test_nonbidir400_" #weight name to save as
+    identifier_post_training = "_quicktest_tiny_bidir_" #weight name to save as
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     Base_Path = "./"
     image_path = "./images/"
@@ -302,17 +305,13 @@ if __name__ == "__main__":
     #TODO function def to create LSTM model
     #TODO boolean flags for retraining
     #TODO: check if model runs just fine with the batch norm layers
+
+    kr = l1_l2()
     a = Input(shape=(None,11))
-    # b = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2()))(a)
-    # b = BatchNormalization(name='bn_between_lstm')(b) #TODO: try all batchnorm on and fastmath is false
-    # c = Bidirectional(LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2()))(b)
-    b = LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2())(a)
-    b = BatchNormalization(name='bn_between_lstm')(b) #TODO: try all batchnorm on and fastmath is false
-    c = LSTM(200,kernel_initializer=lecun_normal(seed=1337),return_sequences=True,kernel_regularizer=l1_l2(),recurrent_regularizer=l1_l2())(b)
-    c = BatchNormalization(name='bn_after_last_lstm')(c)
-    d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=l1_l2(),name='dense_post_concat'))(c)
-    d = BatchNormalization(name='bn_final')(d)
-    out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(d)
+    lstm = reference_bilstm_nodense_tiny(input_tensor=a, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+    d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=kr,name='dense_post_concat'),)(lstm)
+    e = BatchNormalization(name='bn_final')(d)
+    out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(e)
 
     keras_optimizer = rmsprop(lr=0.0015, rho=0.9, epsilon=1e-08, decay=0.0)
     model = Model(inputs=a,outputs=out)
@@ -356,7 +355,8 @@ if __name__ == "__main__":
             #train_array = np.reshape(train_array,(1,train_array.shape[0],train_array.shape[1]))
             #label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
             #--------------------------------------------------------------------------------------
-            print("filename: {}, data/label shape: {}, {}, draw #: {}".format(str(files[0]),train_array.shape,label_array.shape, i))
+            print("filename: {}, data/label shape: {}, {}, "
+                  "draw #: {} out of {}".format(str(files[0]),train_array.shape,label_array.shape, i, num_sequence_draws))
             nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 5)
             shuffled_starting_position = np.random.randint(0,nonlinear_part_starting_position)
 
@@ -381,12 +381,14 @@ if __name__ == "__main__":
             print("fine-tuning/partial training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
+            model.save('./analysis/model_' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         if weights_present_indicator == False and finetune == False:  # fresh training
             print("FRESH training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
+            model.save('./analysis/model_' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         else:  # TESTING ONLY! bypass weights present indicator.

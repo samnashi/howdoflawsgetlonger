@@ -30,7 +30,8 @@ from sklearn.kernel_ridge import KernelRidge
 import time
 from sklearn.externals import joblib
 
-from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
+#from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
+from LSTM_TimeDist import pair_generator_lstm
 from AuxRegressor import create_training_set,create_testing_set,create_model_list,generate_model_id
 
 '''This loads a saved Keras model and uses it as a feature extractor, which then feeds into Scikit-learn multivariate regressors. 
@@ -42,8 +43,17 @@ image_path = "./images/"
 train_path = "./train/"
 test_path = "./test/"
 analysis_path = "./analysis/"
-models_path = analysis_path + "models_to_load/"
+lstm_models_path = analysis_path + "lstm_models_to_load/"
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+def create_lstm_model_list():
+    # load models
+    model_filenames = list(set(os.listdir(lstm_models_path)))
+    # print("before sorting, data_filenames: {}".format(data_filenames))
+    model_filenames.sort(reverse=False)
+    # print("after sorting, data_filenames: {}".format(data_filenames))
+
+    return model_filenames
 
 if __name__ == "__main__":
 
@@ -55,24 +65,31 @@ if __name__ == "__main__":
     #create the data-pair filenames (using zip), use the helper methods
     train_set_filenames = create_training_set()
     test_set_filenames = create_testing_set()
-    model_filenames = create_model_list()
+    lstm_model_filenames = create_lstm_model_list()
     print(train_set_filenames)
     print(test_set_filenames)
-    print(model_filenames)
+    print(lstm_model_filenames)
 
 
     # load model
     #identifier shouldn't have a leading underscore!
     #TODO!!!!! REVERT BACK
-    for model in model_filenames:
-        identifier_post_training = model
+    for lstm_model in lstm_model_filenames:
+        identifier_post_training = lstm_model
         #identifier_post_training = "bag_conv_lstm_dense_tiny_shufstart_softplus_ca_tanh_da_3_cbd_standard_per_batch_sclr_l1l2_kr_HLR.h5"
         # './' + identifier_post_training + '.h5'
-        raw_base_model = load_model(models_path + model)
+        print('loading model: ',lstm_models_path + lstm_model)
+        raw_base_model = load_model(lstm_models_path + lstm_model)
+        cond_conv = any(isinstance(layer, Conv1D) for layer in raw_base_model.layers)
+        cond_lstm = any(isinstance(layer, LSTM) for layer in raw_base_model.layers)
+        cond_bidir = any(isinstance(layer, Bidirectional) for layer in raw_base_model.layers)
+        cond_has_dpc = any(layer.name == 'dense_post_concat' for layer in raw_base_model.layers)
+        print("cond_lstm: ",cond_lstm, "cond_bidir: ",cond_bidir, "cond_has_dpc: ",cond_has_dpc, "cond_conv: ",cond_conv)
+        #assert cond_conv == False and cond_lstm == True and cond_has_dpc == True
         time_dict = {}
 
         #switch to load item in that model_filenames list.
-        print("using: {} as model".format(model))
+        print("using: {} as model".format(lstm_model))
 
         label_scaler_aux_regressor = StandardScaler()
         train_start_time = time.clock()
@@ -91,11 +108,16 @@ if __name__ == "__main__":
             print("data/label shape: {}, {}, draw #: {}".format(train_array.shape, label_array.shape, i))
 
 
-            aux_reg_train_generator = pair_generator_1dconv_lstm_bagged(
+            aux_reg_train_generator = pair_generator_lstm(
                 train_array, label_array, start_at=0, generator_batch_size=GENERATOR_BATCH_SIZE,use_precomputed_coeffs=False,
                 scaled=True, scaler_type = 'standard_per_batch',no_labels=True)
             num_generator_yields = train_array.shape[0]//GENERATOR_BATCH_SIZE
-            base_model = Model(inputs=raw_base_model.input, outputs=raw_base_model.get_layer(name='dense_post_concat').output)
+            #TODO: make this jump out if there is no dense_post_concat.
+            #TODO: ALL THIS STUFF BELOW!!!!!!
+
+
+            base_model = Model(inputs=raw_base_model.input, outputs=raw_base_model.get_layer(name='time_distributed_1').output)
+            #timedist is a wrapper, so the original layer's name (dense_post_concat) is obscured
             base_model_output = base_model.predict_generator(aux_reg_train_generator,
                                                              steps=num_generator_yields)
             #print(type(base_model_output))
@@ -121,14 +143,14 @@ if __name__ == "__main__":
             #label_array_reshaped = np.reshape(label_array,newshape=()) #reshape to what? it needed reshaping for the Keras LSTM.
             #label_dmatrix = xgb.DMatrix(data=label_array) #forget trying to get it through the generator.
             #print(type(base_model_output_2d), type(label_array))
-            print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d.shape, label_array.shape))
+            print("for fitting: feature shape: {}, uncut label shape: {}, CUT label shape: {}".format(base_model_output_2d.shape, label_array.shape, label_array_to_fit.shape))
 
             if i == 0: #initialize for the first time
                 #aux_reg_regressor = Ridge()
                 #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
                 #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
-                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True,oob_score=False)
+                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True)
 
                 model_id = generate_model_id(aux_reg_regressor)
                 assert model_id != ""
@@ -145,7 +167,7 @@ if __name__ == "__main__":
 
             if i != 0:
                 #aux_reg_regressor = aux_reg_regressor_cached
-                label_array_to_fit = label_scaler_aux_regressor.fit_transform(label_array[0:base_model_output_2d.shape[0],:])
+                #label_array_to_fit = label_scaler_aux_regressor.fit_transform(label_array[0:base_model_output_2d.shape[0],:])
                 print("fitting regressor..")
                 if tree_regressor_check_cond == True:
                     print("feat_imp before fitting: {}".format(aux_reg_regressor.feature_importances_))
@@ -197,8 +219,8 @@ if __name__ == "__main__":
         getparams_dict = aux_reg_regressor.get_params(deep=True)
         print("getparams_dict: ", getparams_dict)
         getparams_df = pd.DataFrame.from_dict(data=getparams_dict,orient='index')
-        getparams_df.to_csv(analysis_path + model_id + str(model)[:-4] + "getparams.csv")
-        model_as_pkl_filename = analysis_path + model_id + str(model)[:-4] +".pkl"
+        getparams_df.to_csv(analysis_path + model_id + str(lstm_model)[:-4] + "getparams.csv")
+        model_as_pkl_filename = analysis_path + model_id + str(lstm_model)[:-4] + ".pkl"
         joblib.dump(aux_reg_regressor,filename=model_as_pkl_filename)
         #np.savetxt(analysis_path + "rf5getparams.txt",fmt='%s',X=str(aux_reg_regressor.get_params(deep=True)))
         #np.savetxt(analysis_path + "rf5estimatorparams.txt",fmt='%s',X=aux_reg_regressor.estimator_params) USELESS
@@ -222,7 +244,7 @@ if __name__ == "__main__":
             # print("Metrics: {}".format(model.metrics_names))
             # steps per epoch is how many times that generator is called
 
-            test_generator = pair_generator_1dconv_lstm_bagged(
+            test_generator = pair_generator_lstm(
                 test_array, test_label_array, start_at=0, generator_batch_size=GENERATOR_BATCH_SIZE,
                 use_precomputed_coeffs=False,
                 scaled=True, scaler_type='standard_per_batch',no_labels=True)
@@ -267,7 +289,7 @@ if __name__ == "__main__":
             if  save_preds == True:
                 #<class 'sklearn.ensemble.forest.RandomForestRegressor'>
                 #< class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
-                preds_filename = analysis_path + "preds_" + model_id + "_" + str(files[0])[:-4] + "_" + str(model)[:-3]
+                preds_filename = analysis_path + "preds_" + model_id + "_" + str(files[0])[:-4] + "_" + str(lstm_model)[:-3]
                 np.save(file=preds_filename, arr=preds)
             mse_score = mean_squared_error(test_label_array_to_fit,preds)
             mse_score_f3 = mean_squared_error(test_label_array_to_fit[index_last_3_batches:, :],
@@ -305,4 +327,4 @@ if __name__ == "__main__":
     # r2_scores_df.to_csv("./analysis/r2_rf5a_" + str(model) + ".csv")
     # mse_scores_df.to_csv("./analysis/mse_rf5a_" + str(model) + ".csv")
     # mae_scores_df.to_csv("./analysis/mae_rf5a_" + str(model) + ".csv")
-    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(model)[:-3] + ".csv")
+    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(lstm_model)[:-3] + ".csv")

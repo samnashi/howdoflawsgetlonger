@@ -46,7 +46,7 @@ models_path = analysis_path + "models_to_load/"
 
 
 def mape(y_true, y_pred, epsilon=1e-07):
-    y_true, y_pred = check_array(y_true, y_pred)
+    #y_true, y_pred = check_array(y_true, y_pred)
 
     ## Note: does not handle mix 1d representation
     # if _is_1d(y_true):
@@ -72,7 +72,7 @@ def create_training_set():
     # print("before shuffling: {}".format(combined_filenames))
     shuffle(combined_filenames)
     print("after shuffling: {}".format(combined_filenames))  # shuffling works ok.
-    print('Data loaded.')
+    print('Training data read.')
 
     return combined_filenames
 
@@ -92,7 +92,7 @@ def create_testing_set():
     # print("before shuffling: {}".format(combined_test_filenames))
     shuffle(combined_test_filenames)
     print("after shuffling: {}".format(combined_test_filenames))  # shuffling works ok.
-
+    print("Test set read.")
     return combined_test_filenames
 
 
@@ -116,12 +116,20 @@ def generate_model_id(model_sklearn):
         model_type = "rf"
         dict = model_sklearn.get_params(deep=True)
         estim_num = int(dict['n_estimators'])
-        model_type = model_type + str(estim_num)
+        if dict['warm_start'] == True:
+            warm_start_or_not = '_ws_'
+        if dict['warm_start'] == False:
+            warm_start_or_not = '_nws_'
+        model_type = model_type + str(estim_num) + warm_start_or_not
     if isinstance(model_sklearn, ExtraTreesRegressor):
         model_type = "et"
         dict = model_sklearn.get_params(deep=True)
         estim_num = int(dict['n_estimators'])
-        model_type = model_type + str(estim_num)
+        if dict['warm_start'] == True:
+            warm_start_or_not = '_ws_'
+        if dict['warm_start'] == False:
+            warm_start_or_not = '_nws_'
+        model_type = model_type + str(estim_num) + warm_start_or_not
     if isinstance(model_sklearn, Ridge):
         model_type = "ridge"
         dict = model_sklearn.get_params(deep=True)
@@ -130,15 +138,14 @@ def generate_model_id(model_sklearn):
     if isinstance(model_sklearn, LinearRegression):
         model_type = "linreg"
         dict = model_sklearn.get_params(deep=True)
-        solver_type = str(dict['solver'])
-        model_type = model_type + solver_type
+        model_type = model_type
         model_identifier = model_type
-    return str(model_identifier)
+    return str(model_type)
 
 
 if __name__ == "__main__":
 
-    num_sequence_draws = 100
+    num_sequence_draws = 200
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1  # because you gotta feed the base model the same way you fed it during training... (RNN commandments)
     save_preds = True
@@ -146,10 +153,10 @@ if __name__ == "__main__":
     # create the data-pair filenames (using zip), use the helper methods
     train_set_filenames = create_training_set()
     test_set_filenames = create_testing_set()
-    model_filenames = create_model_list()
-    print(train_set_filenames)
-    print(test_set_filenames)
-    print(model_filenames)
+    #model_filenames = create_model_list()
+    print("train set filenames: ", train_set_filenames)
+    print("test set filenames: ", test_set_filenames)
+    #print(model_filenames)
 
     # load model
     # identifier shouldn't have a leading underscore!
@@ -162,6 +169,7 @@ if __name__ == "__main__":
     tree_regressor_check_cond = False
     time_dict = {}
     # batch_pointer = 0
+
     for i in range(0, num_sequence_draws):
         index_to_load = np.random.randint(0, len(train_set_filenames))  # switch to iterations
         files = train_set_filenames[index_to_load]
@@ -202,11 +210,15 @@ if __name__ == "__main__":
         if i == 0:  # initialize for the first time
             # label_array_to_fit = label_scaler_aux_regressor.fit_transform(label_array[0:base_model_output_2d.shape[0],
             #                                                               :])  # but this is scaling the whole label set, not per batch.
-            # aux_reg_regressor = Ridge(solver='cholesky') #'svd'(in progress) 'cholesky'(done) #'sparse_cg' #'lsqr'(inprog) #'sag'(inprog) #'saga'(inprog)
-            aux_reg_regressor = LinearRegression(n_jobs=-1)
+            #aux_reg_regressor = Ridge(solver='cholesky') #'svd'(in progress) 'cholesky'(done) #'sparse_cg' #'lsqr'(inprog) #'sag'(inprog) #'saga'(inprog)
+            #aux_reg_regressor = LinearRegression(n_jobs=-1)
             # aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
-            # aux_reg_regressor = ExtraTreesRegressor(n_estimators=30,criterion='mse',n_jobs=-1,warm_start=True)
-            # aux_reg_regressor = RandomForestRegressor(n_estimators=30, criterion='mse', n_jobs=-1, warm_start=True)
+            #aux_reg_regressor = ExtraTreesRegressor(n_estimators=30,criterion='mae',n_jobs=2,warm_start=True)
+            aux_reg_regressor = RandomForestRegressor(n_estimators=30, criterion='mae', n_jobs=-1, warm_start=True)
+
+            model_id = generate_model_id(aux_reg_regressor)
+            assert model_id != ""
+            print("model id is: ", model_id)
 
             print("fitting regressor..")
             aux_reg_regressor.fit(X=train_array_to_fit, y=label_array_to_fit)
@@ -256,16 +268,19 @@ if __name__ == "__main__":
     print("after shuffling: {}".format(combined_filenames))  # shuffling works ok.
 
     i = 0
-    # TODO: still only saves single results.
     score_rows_list = []
     scores_dict = {}
     mse_dict = {}
     mae_dict = {}
     mape_dict = {}
+    
+    scores_dict_f3 = {}
+    mse_dict_f3 = {}
+    mae_dict_f3 = {}
+    mape_dict_f3 = {}
     test_start_time = time.clock()
 
     # try to save the trees attribute
-    model_id = generate_model_id(aux_reg_regressor)
     if tree_regressor_check_cond == True:
         print("aux_reg_regressor estimator_params", aux_reg_regressor.estimators_)
     getparams_dict = aux_reg_regressor.get_params(deep=True)
@@ -297,6 +312,8 @@ if __name__ == "__main__":
         print(files[0])
         # print("Metrics: {}".format(model.metrics_names))
         # steps per epoch is how many times that generator is called
+        
+        #generator_batch_size*(data.shape[1]//generator_batch_size
 
         batch_scaled_inputs = np.zeros(shape=(test_array.shape))  # TODO CHECK THE // GENERATOR_BATCH_SIZE part
         for test_batch_scaler_counter in range(0, test_array.shape[0]):  # how many batches there are
@@ -318,22 +335,49 @@ if __name__ == "__main__":
 
         # tested_regressor = pkl.loads(trained_regressor)
         test_label_array_to_fit = batch_scaled_test_labels[0:test_array_to_fit.shape[0], :]
+        index_last_3_batches = batch_scaled_test_labels.shape[0] - 3 * GENERATOR_BATCH_SIZE
+        
         score = aux_reg_regressor.score(X=test_array_to_fit, y=test_label_array_to_fit)
+        
+        score_f3 = aux_reg_regressor.score(X=test_array_to_fit[index_last_3_batches:,:], 
+                                           y=test_label_array_to_fit[index_last_3_batches:,:])
         print("score: {}".format(score))
-        scores_dict[str(files[0])] = score
+        print("score_f3: {}".format(score_f3))
+        scores_dict[str(files[0])[:-4]] = score
+        scores_dict_f3[str(files[0])[:-4]] = score_f3
+        
         preds = aux_reg_regressor.predict(test_array_to_fit)
+        
         if save_preds == True:
             # <class 'sklearn.ensemble.forest.RandomForestRegressor'>
             # < class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
             preds_filename = analysis_path + "preds_" + model_id + "_" + str(files[0])
             np.save(file=preds_filename, arr=preds)
         mse_score = mean_squared_error(test_label_array_to_fit, preds)
+        mse_score_f3 = mean_squared_error(test_label_array_to_fit[index_last_3_batches:,:],
+                                          preds[index_last_3_batches:,:])
         print("mse: {}".format(mse_score))
+        print("mse_f3: {}".format(mse_score_f3))
+        mse_dict[str(files[0])[:-4]] = mse_score
+        mse_dict_f3[str(files[0])[:-4]] = mse_score_f3
+        
         mae_score = mean_absolute_error(test_label_array_to_fit, preds)
+        mae_score_f3 = mean_absolute_error(test_label_array_to_fit[index_last_3_batches:,:],
+                                           preds[index_last_3_batches:,:])
         # mape_score = mape(test_label_array_to_fit, preds)
         print("mae: {}".format(mae_score))
-        mse_dict[str(files[0])] = mse_score
-        mae_dict[str(files[0])] = mae_score
+        print("mae_f3: {}".format(mae_score_f3))
+        mae_dict[str(files[0])[:-4]] = mae_score
+        mae_dict_f3[str(files[0])[:-4]] = mae_score_f3
+
+        # mape_score = mape(test_label_array_to_fit, preds)
+        # mape_score_f3 = mape(test_label_array_to_fit[index_last_3_batches:,:],preds[index_last_3_batches:,:])
+        # print("mape: {}".format(mape_score))
+        # print("mape_f3: {}".format(mape_score_f3))
+        # mape_dict[str(files[0])] = mape_score
+        # mape_dict_f3[str(files[0])] = mape_score_f3
+        
+        
         # mape_dict[str(files[0])] = mape_score
     test_end_time = time.clock()
     test_time_elapsed = test_end_time - test_start_time
@@ -348,15 +392,26 @@ if __name__ == "__main__":
     # mse_scores_df.rename(columns=['mse'])
     mae_scores_df = pd.DataFrame.from_dict(mae_dict, orient='index')
     # mae_scores_df.rename(columns=['mae'])
-    # mape_scores_df = pd.DataFrame.from_dict(mape_dict, orient = 'index')
+    #mape_scores_df = pd.DataFrame.from_dict(mape_dict, orient = 'index')
 
     name_list = ['filename', 'r2', 'mse', 'mae']
-
     scores_combined_df = pd.DataFrame(pd.concat([r2_scores_df, mse_scores_df, mae_scores_df], axis=1))
     scores_combined_df.set_axis(labels=name_list[1:], axis=1)
+    scores_combined_df.index.rename(name='seq_name',inplace=True)
 
-    # time_df.to_csv("./analysis/time_rf5a_" + str(model) + ".csv")
-    # r2_scores_df.to_csv("./analysis/r2_rf5a_" + str(model) + ".csv")
-    # mse_scores_df.to_csv("./analysis/mse_rf5a_" + str(model) + ".csv")
-    # mae_scores_df.to_csv("./analysis/mae_rf5a_" + str(model) + ".csv")
-    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + ".csv")
+    scores_combined_df.to_csv("./analysis/combi_scores_fv1c_" + model_id + "_" + str(num_sequence_draws) + "sd.csv")
+
+    #the f3 ones.
+    r2_scores_f3_df = pd.DataFrame.from_dict(scores_dict_f3, orient='index')
+    # r2_scores_df.rename(columns=['r2'])
+    mse_scores_f3_df = pd.DataFrame.from_dict(mse_dict_f3, orient='index')
+    # mse_scores_df.rename(columns=['mse'])
+    mae_scores_f3_df = pd.DataFrame.from_dict(mae_dict_f3, orient='index')
+    # mae_scores_df.rename(columns=['mae'])
+    # mape_scores_f3_df = pd.DataFrame.from_dict(mape_dict_f3, orient = 'index')
+    scores_combined_f3_df = pd.DataFrame(pd.concat([r2_scores_f3_df, mse_scores_f3_df, mae_scores_f3_df], axis=1))
+    scores_combined_f3_df.set_axis(labels=name_list[1:], axis=1)
+    scores_combined_f3_df.index.rename(name='seq_name',inplace=True)
+
+    scores_combined_df.to_csv("./analysis/combi_scores_f3_fv1c_" + model_id + "_mae_" + str(num_sequence_draws) + "sd.csv")
+    print("model id: ",model_id)
