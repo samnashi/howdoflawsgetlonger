@@ -512,19 +512,19 @@ if __name__ == "__main__":
     param_dict_HLR['FeatWeight'] = [2]
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
     param_dict_HLR['GenPad'] = [128]
-    param_dict_HLR['ConvAct']=['elu']
+    param_dict_HLR['ConvAct']=['relu']
     param_dict_HLR['DenseAct']=['tanh']
     param_dict_HLR['KernelReg']=[l1_l2()]
     param_dict_HLR['ConvBlockDepth'] = [3]
     param_dict_HLR['id_pre'] = [] #initialize to blank first
     param_dict_HLR['id_post'] = []
-    param_dict_HLR['ScalerType'] = ['robust_per_batch']
+    param_dict_HLR['ScalerType'] = ['standard_per_batch']
     reg_id = "" #placeholder. Keras L1 or L2 regularizers are 1 single class. You have to use get_config()['l1'] to see whether it's L1, L2, or L1L2
 
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_testnewadaptiveoutput_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_fv1c_64d_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -560,8 +560,8 @@ if __name__ == "__main__":
 
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
-        num_epochs = 2  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 15 # how many times the training corpus is sampled.
+        num_epochs = 4  # individual. like how many times is the net trained on that sequence consecutively
+        num_sequence_draws = 300 # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -571,12 +571,12 @@ if __name__ == "__main__":
         if active_scaler_type != "None":
             assert(scaler_active != False) #makes sure that if a scaler type is specified, the "scaler active" flag is on (the master switch)
 
-        base_seq_circumnav_amt = 1.0 #default value, the only one if adaptive circumnav is False
+        base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 1
+            aux_circumnav_onset_draw = 200
             assert(aux_circumnav_onset_draw < num_sequence_draws)
-            aux_seq_circumnav_amt = 1.2 #only used if adaptive_circumnav is True
+            aux_seq_circumnav_amt = 1.5 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
 
         save_preds = True
@@ -703,13 +703,13 @@ if __name__ == "__main__":
         tensors_to_concat = [g1, f2, g3, f4, g5, f6, g7, f8, f9, f10, f11]
         g = concatenate(tensors_to_concat)
         h = BatchNormalization()(g)
-        i = Dense(240,activation=da,kernel_regularizer=kr,name='dense_post_concat')(h)
+        i = Dense(64,activation=da,kernel_regularizer=kr,name='dense_post_concat',activity_regularizer=kr,bias_regularizer=kr)(h)
         j = BatchNormalization()(i)
         out = Dense(4)(j)
 
         model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.005)
+        optimizer_used = rmsprop(lr=0.0025)
         metrics_list = ['mae', 'mape', 'mse','msle']
         model.compile(loss='mse', optimizer=optimizer_used, metrics=metrics_list)
         print("Model summary: {}".format(model.summary()))
@@ -764,7 +764,7 @@ if __name__ == "__main__":
                 label_array = np.load(label_load_path)[:, 1:]
                 if train_array.shape[1] != 11:
                     train_array = train_array[:,1:]
-                print("data/label shape: {}, {}, draw #: {}".format(train_array.shape, label_array.shape, i))
+                print("data/label shape: {}, {}, draw #: {} out of {}".format(train_array.shape, label_array.shape, i, num_sequence_draws))
                 # train_array = np.reshape(train_array,(1,generator_batch_size,train_array.shape[1]))
                 # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label needs to be 3D for TD!
 
@@ -772,7 +772,7 @@ if __name__ == "__main__":
                 nonlinear_part_starting_position = generator_batch_size * ((train_array.shape[0] // generator_batch_size) - 3)
                 shuffled_starting_position = np.random.randint(0, nonlinear_part_starting_position)
                 #active_starting_position = shuffled_starting_position #doesn't start from 0, if the model is still in the 1st phase of training
-                active_starting_position = 0
+                active_starting_position = shuffled_starting_position
 
                 if adaptive_circumnav == True and i >= aux_circumnav_onset_draw:
                     active_seq_circumnav_amt = aux_seq_circumnav_amt

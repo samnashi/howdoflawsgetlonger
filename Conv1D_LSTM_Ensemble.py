@@ -796,7 +796,7 @@ if __name__ == "__main__":
         # reference_bilstm outputs the 64-time-dist-dense unit.
         lstm_in = Input(shape=(None, 11),name='lstm_input')  # still need to mod the generator to not pad...
 
-        lstm = reference_bilstm_nodense_tiny(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+        lstm = reference_bilstm_nodense_medium(input_tensor=lstm_in, k_reg=kr, k_init='orthogonal', rec_reg=kr)
         lstm_bn = BatchNormalization(name='final_bn')(lstm)
         lstm_out = Dense(4,name='lstm_output')(lstm_bn)
 
@@ -810,7 +810,7 @@ if __name__ == "__main__":
 
         model = Model(inputs=[lstm_in, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=[out,lstm_out])
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.0015)
+        optimizer_used = rmsprop(lr=0.0025)
         #optimizer_used = adam(lr=0.0085,decay=0.00001)
         # loss = {'main_output': 'binary_crossentropy', 'aux_output': 'binary_crossentropy'},
         # loss_weights = {'main_output': 1., 'aux_output': 0.2})

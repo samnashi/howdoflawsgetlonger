@@ -183,7 +183,7 @@ train_describe_result_df = pd.DataFrame.from_dict(batch_stats_dict, orient='inde
 print("len(colnames): {} len(flattened): {} colnames_list: {}".format(len(colnames_list),chunk_ndarray_flattened.shape,colnames_list))
 #assert(len(colnames_list) == chunk_ndarray_flattened.shape[0])
 
-train_describe_result_df.to_csv(analysis_path + 'test_corpus_describe_result2.csv',header=colnames_list)
+train_describe_result_df.to_csv(analysis_path + 'test_corpus_describe_result3.csv',header=colnames_list)
 # except:
 #     print("writing the csv without headers.")
 #     train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv')

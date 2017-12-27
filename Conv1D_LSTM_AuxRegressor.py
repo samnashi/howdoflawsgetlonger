@@ -29,6 +29,9 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, median_abso
 from sklearn.kernel_ridge import KernelRidge
 import time
 from sklearn.externals import joblib
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.linear_model import ElasticNet
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 from AuxRegressor import create_training_set,create_testing_set,create_model_list,generate_model_id
@@ -47,10 +50,10 @@ models_path = analysis_path + "models_to_load/"
 
 if __name__ == "__main__":
 
-    num_sequence_draws = 5
+    num_sequence_draws = 25
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1 #because you gotta feed the base model the same way you fed it during training... (RNN commandments)
-    save_preds = True
+    save_preds = False
 
     #create the data-pair filenames (using zip), use the helper methods
     train_set_filenames = create_training_set()
@@ -128,15 +131,20 @@ if __name__ == "__main__":
                 #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
                 #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
-                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True,oob_score=False)
+                #aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True,oob_score=False)
+                #aux_reg_regressor = MultiOutputRegressor(estimator = GaussianProcessRegressor(random_state=1337),n_jobs=1) #MEMORY ERROR
+                aux_reg_regressor = MultiOutputRegressor(estimator=ElasticNet(warm_start=True),
+                                                         n_jobs=1)
 
                 model_id = generate_model_id(aux_reg_regressor)
                 assert model_id != ""
                 print("model id is: ", model_id)
 
                 print("fitting regressor..")
-
-                aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
+                if isinstance(aux_reg_regressor,MultiOutputRegressor) == True:
+                    aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit) #should be partial fit
+                else:
+                    aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
 
                 if isinstance(aux_reg_regressor,ExtraTreesRegressor) or isinstance(aux_reg_regressor,RandomForestRegressor):
                     tree_regressor_check_cond = True
@@ -150,7 +158,10 @@ if __name__ == "__main__":
                 if tree_regressor_check_cond == True:
                     print("feat_imp before fitting: {}".format(aux_reg_regressor.feature_importances_))
 
-                aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
+                if isinstance(aux_reg_regressor,MultiOutputRegressor) == True:
+                    aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
+                else:
+                    aux_reg_regressor.fit(X=base_model_output_2d, y=label_array_to_fit)
 
                 if tree_regressor_check_cond == True:
                     print("feat_imp after fitting: {}".format(aux_reg_regressor.feature_importances_))
@@ -183,14 +194,19 @@ if __name__ == "__main__":
 
         i = 0
         score_rows_list = []
+        score_rows_list_scikit_raw = []
         scores_dict = {}
         mse_dict = {}
+        mse_dict_raw = {}
         mae_dict = {}
+        mae_dict_raw = {}
         mape_dict = {}
 
         scores_dict_f3 = {}
         mse_dict_f3 = {}
+        mse_dict_f3_raw = {}
         mae_dict_f3 = {}
+        mae_dict_f3_raw = {}
         mape_dict_f3 = {}
         test_start_time = time.clock()
 
@@ -269,21 +285,42 @@ if __name__ == "__main__":
                 #< class 'sklearn.ensemble.forest.ExtraTreesRegressor'>
                 preds_filename = analysis_path + "preds_" + model_id + "_" + str(files[0])[:-4] + "_" + str(model)[:-3]
                 np.save(file=preds_filename, arr=preds)
-            mse_score = mean_squared_error(test_label_array_to_fit,preds)
-            mse_score_f3 = mean_squared_error(test_label_array_to_fit[index_last_3_batches:, :],
-                                              preds[index_last_3_batches:, :])
-            print("mse: {}".format(mse_score))
-            print("mse_f3: {}".format(mse_score_f3))
-            mse_dict[str(files[0])[:-4]] = mse_score
-            mse_dict_f3[str(files[0])[:-4]] = mse_score_f3
 
-            mae_score = mean_absolute_error(test_label_array_to_fit,preds)
-            mae_score_f3 = mean_absolute_error(test_label_array_to_fit[index_last_3_batches:, :],
+            row_dict_scikit_raw = {}
+
+            mse = mean_squared_error(test_label_array_to_fit, preds)
+            mse_raw = mean_squared_error(test_label_array_to_fit, preds, multioutput='raw_values')
+            mse_f3 = mean_squared_error(test_label_array_to_fit[index_last_3_batches:, :],
                                               preds[index_last_3_batches:, :])
-            print("mae: {}".format(mae_score))
-            print("mae_f3: {}".format(mae_score_f3))
-            mae_dict[str(files[0])[:-4]] = mae_score
-            mae_dict_f3[str(files[0])[:-4]] = mae_score_f3
+            mse_f3_raw = mean_squared_error(test_label_array_to_fit[index_last_3_batches:, :],
+                                              preds[index_last_3_batches:, :], multioutput='raw_values')
+            print("mse: {}".format(mse))
+            print("mse_f3: {}".format(mse_f3))
+            mse_dict[str(files[0])[:-4]] = mse
+            mse_dict_f3[str(files[0])[:-4]] = mse_f3
+
+            for flaw in range(0, len(mse_raw)):
+                row_dict_scikit_raw['mse_' + str(flaw)] = mse_raw[flaw]
+            for flaw in range(0, len(mse_f3_raw)):
+                row_dict_scikit_raw['mse_f3_' + str(flaw)] = mse_f3_raw[flaw]
+
+            mae = mean_absolute_error(test_label_array_to_fit, preds)
+            mae_raw = mean_absolute_error(test_label_array_to_fit, preds, multioutput='raw_values')
+            mae_f3 = mean_absolute_error(test_label_array_to_fit[index_last_3_batches:, :],
+                                              preds[index_last_3_batches:, :])
+            mae_f3_raw = mean_absolute_error(test_label_array_to_fit[index_last_3_batches:, :],
+                                              preds[index_last_3_batches:, :], multioutput='raw_values')
+            print("mae: {}".format(mae))
+            print("mae_f3: {}".format(mae_f3))
+            mae_dict[str(files[0])[:-4]] = mae
+            mae_dict_f3[str(files[0])[:-4]] = mae_f3
+            for flaw in range(0, len(mae_raw)):
+                row_dict_scikit_raw['mae_' + str(flaw)] = mae_raw[flaw]
+            for flaw in range(0, len(mae_f3_raw)):
+                row_dict_scikit_raw['mae_f3_' + str(flaw)] = mae_f3_raw[flaw]
+
+            score_rows_list_scikit_raw.append(row_dict_scikit_raw)
+
     test_end_time = time.clock()
     test_time_elapsed = test_end_time - test_start_time
     print("test time elapsed: {}".format(test_time_elapsed))
@@ -306,3 +343,7 @@ if __name__ == "__main__":
     # mse_scores_df.to_csv("./analysis/mse_rf5a_" + str(model) + ".csv")
     # mae_scores_df.to_csv("./analysis/mae_rf5a_" + str(model) + ".csv")
     scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(model)[:-3] + ".csv")
+
+    #score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
+
+    raw_scores_df = pd.DataFrame(data=score_rows_list_scikit_raw,columns = score_rows_list_scikit_raw[0].keys())

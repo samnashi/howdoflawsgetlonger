@@ -134,16 +134,12 @@ def reference_bilstm_nodense_micro(input_tensor, k_init=lecun_normal(seed=1337),
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp, stateful=sf))(i)
     j = BatchNormalization()(j)
-    # k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
-    #                           kernel_regularizer=k_reg))(j)
-    # l = BatchNormalization()(k)
-    # out = Dense(4)(l)
     out = j
     return out
 
 def reference_bilstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(), sf=False,
                                   imp=2, dense_act='tanh'):
-    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    '''reference TINY BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = Bidirectional(LSTM(64, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
@@ -153,16 +149,12 @@ def reference_bilstm_nodense_tiny(input_tensor, k_init=lecun_normal(seed=1337), 
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp, stateful=sf))(i)
     j = BatchNormalization()(j)
-    # k = TimeDistributed(Dense(4, kernel_initializer=k_init, activation=dense_act,
-    #                           kernel_regularizer=k_reg))(j)
-    # l = BatchNormalization()(k)
-    # out = Dense(4)(l)
     out = j
     return out
 
 def reference_bilstm_nodense_medium(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(),
                                     sf=False, imp=2, dense_act='tanh'):
-    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    '''reference MEDIUM BiLSTM with batchnorm and TD-dense.
     Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
     h = Bidirectional(LSTM(100, kernel_initializer=k_init, return_sequences=True,
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
@@ -172,10 +164,21 @@ def reference_bilstm_nodense_medium(input_tensor, k_init=lecun_normal(seed=1337)
                            recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
                            implementation=imp, stateful=sf))(i)
     j = BatchNormalization()(j)
-    # k = TimeDistributed(Dense(16, kernel_initializer=k_init, activation=dense_act,
-    #                           kernel_regularizer=k_reg))(j)
-    # l = BatchNormalization()(k)
-    # out = Dense(4)(l)
+    out = j
+    return out
+
+def reference_bilstm_nodense_big(input_tensor, k_init=lecun_normal(seed=1337), k_reg=l1(), rec_reg=l1(),
+                                    sf=False, imp=2, dense_act='tanh'):
+    '''reference SMALL BiLSTM with batchnorm and TD-dense.
+    Expects ORIGINAL input batch size so pad/adjust window size accordingly!'''
+    h = Bidirectional(LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf))(input_tensor)
+    i = BatchNormalization()(h)
+    j = Bidirectional(LSTM(200, kernel_initializer=k_init, return_sequences=True,
+                           recurrent_regularizer=rec_reg, kernel_regularizer=k_reg,
+                           implementation=imp, stateful=sf))(i)
+    j = BatchNormalization()(j)
     out = j
     return out
 
@@ -248,22 +251,22 @@ if __name__ == "__main__":
     #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 100 #how many times the training corpus is sampled.
+    num_sequence_draws = 500 #how many times the training corpus is sampled.
     generator_batch_size = 128
     finetune = False
     test_only = False #no training. if finetune is also on, this'll raise an error.
     use_precomp_sscaler = True
-    sequence_circumnavigation_amt = 1.5
+    sequence_circumnavigation_amt = 0.7
     save_preds = True
     save_figs = False
     identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
-    identifier_post_training = "_quicktest_tiny_bidir_" #weight name to save as
+    identifier_post_training = "_micro_bidir_" #weight name to save as
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     Base_Path = "./"
     image_path = "./images/"
     train_path = "./train/"
     test_path = "./test/"
-    analysis_path = "./analysis."
+    analysis_path = "./analysis/"
     # ^^^^^^^^^^^^^ TO RUN ON CHEZ CHAN ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     # Base_Path = "/home/devin/Documents/PITTA LID/"
     # image_path = "/home/devin/Documents/PITTA LID/img/"
@@ -308,7 +311,7 @@ if __name__ == "__main__":
 
     kr = l1_l2()
     a = Input(shape=(None,11))
-    lstm = reference_bilstm_nodense_tiny(input_tensor=a, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+    lstm = reference_bilstm_nodense_micro(input_tensor=a, k_reg=kr, k_init='orthogonal', rec_reg=kr)
     d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=kr,name='dense_post_concat'),)(lstm)
     e = BatchNormalization(name='bn_final')(d)
     out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(e)
@@ -322,7 +325,7 @@ if __name__ == "__main__":
     print ("Outputs: {}".format(model.output_shape))
     print ("Metrics: {}".format(model.metrics_names))
 
-    plot_model(model, to_file='model_' + identifier_post_training + '.png', show_shapes=True)
+    plot_model(model, to_file = analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
     #print ("Actual input: {}".format(data.shape))
     #print ("Actual output: {}".format(target.shape))
     weights_present_indicator = os.path.isfile('Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')

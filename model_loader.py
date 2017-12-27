@@ -75,10 +75,10 @@ def create_generator(model_type, data, labels, start_at = 0,scaled = True,
 if __name__ == "__main__":
 
 ############################## RUNNING PARAMETERS #########################################################################
-    num_sequence_draws = 2  # how many times the training corpus is sampled.
+    num_sequence_draws = 10  # how many times the training corpus is sampled.
     GENERATOR_BATCH_SIZE = 128
     GENERATOR_PAD = 128 #for the conv-only and conv-LSTM generator.
-    num_epochs = 1  # individual. like how many times is the net trained on that sequence consecutively
+    num_epochs = 3  # individual. like how many times is the net trained on that sequence consecutively
     finetune = True
     test_only = False  # no training. if finetune is also on, this'll raise an error.
     scaler_active = True
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     base_seq_circumnav_amt = 1.0  # default value, the only one if adaptive circumnav is False
     adaptive_circumnav = True
     if adaptive_circumnav == True:
-        aux_circumnav_onset_draw = 1
+        aux_circumnav_onset_draw = 3
         assert (aux_circumnav_onset_draw < num_sequence_draws)
         aux_seq_circumnav_amt = 1.5  # only used if adaptive_circumnav is True
         assert (base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     model_filenames = create_model_list()
 
     #TODO: THIS BELOW!!!!
-    for model in model_filenames[0:1]:
+    for model in model_filenames:
         identifier_post_training = model
         raw_base_model = load_model(models_path + model)
         print("model loaded.")
@@ -135,6 +135,7 @@ if __name__ == "__main__":
 
         #should be any item in metrics_list not in raw_base_model_metrics. any(metric not in raw_base_model.metrics for metric in metrics_list)
         cond_mismatched_metrics = any(metric not in raw_base_model.metrics for metric in metrics_list)
+        #cond_not_multioutput = len(raw_base_model.metrics) >
         if cond_mismatched_metrics == True: #e.g. missing mse, recompile using the existing optimizers.
             print("mismatched metrics, model's metrics are currently: ",raw_base_model.metrics)
             existing_optimizer = raw_base_model.optimizer
@@ -142,12 +143,14 @@ if __name__ == "__main__":
             raw_base_model.compile(optimizer = existing_optimizer,loss=existing_loss,metrics=metrics_list)
 
         print("model type is: ",model_type, " with metrics: ", raw_base_model.metrics_names)
+        plot_model(raw_base_model, to_file=analysis_path + 'model_' + identifier_post_training + '_' + str(model)[:-4] + '.png', show_shapes=True)
+
 
 #####################################################################################################
 
         weights_file_name = None
-        identifier_post_training = 'f1' #for weights
-        identifier_pre_training = 'f2' #for weights
+        identifier_post_training = 'f1' #placeholder for weights
+        identifier_pre_training = 'f2' #placeholder, for weights
         if finetune == False:
             weights_present_indicator = os.path.isfile(
                 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5')
@@ -234,14 +237,14 @@ if __name__ == "__main__":
             print("fine-tuning/partial training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             #trained_model.save_weights(analysis_path + weights_file_name)
-            trained_model.save(analysis_path + 'model_' + identifier_post_training + '.h5')
+            trained_model.save(results_path + 'model_' + identifier_post_training + '_' + str(model)[:-3] + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         if weights_present_indicator == False and finetune == False:  # fresh training
             print("FRESH training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             #trained_model.save_weights(weights_file_name)
-            trained_model.save(analysis_path + 'model_' + identifier_post_training + '.h5')
+            trained_model.save(results_path + 'model_' + identifier_post_training + '_' + str(model)[:-3] + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         else:  # TESTING ONLY! bypass weights present indicator.
@@ -300,6 +303,7 @@ if __name__ == "__main__":
             # TODO: still only saves single results.
             score_rows_list = []
             score_rows_list_scikit = []
+            score_rows_list_scikit_raw = []
             for files in combined_test_filenames:
                 i = i + 1
                 data_load_path = test_path + '/data/' + files[0]
@@ -316,7 +320,7 @@ if __name__ == "__main__":
                 # test_array = np.reshape(test_array, (1, test_array.shape[0], test_array.shape[1]))
                 # label_array = np.reshape(label_array,(1,label_array.shape[0],label_array.shape[1])) #label doesn't need to be 3D
                 # print("file: {} data/label shape: {}, {}".format(files[0],test_array.shape, label_array.shape))
-                print("sequence being tested: ",files[0], "number ", i, "out of ", len(combined_test_filenames))
+                print("sequence being tested: ",files[0], ", number ", i, "out of ", len(combined_test_filenames))
                 # print("Metrics: {}".format(model.metrics_names))
                 # steps per epoch is how many times that generator is called
 
@@ -365,6 +369,7 @@ if __name__ == "__main__":
 
                 row_dict = {}
                 row_dict_scikit = {} #for the scikit-based metrics.
+                row_dict_scikit_raw = {} #for the raw-value scikit-based metrics
 
                 row_dict['seq_name'] = str(files[0])[:-4]
                 for item in metrics_list:
@@ -415,7 +420,7 @@ if __name__ == "__main__":
                         y_pred[0, test_i:test_i + GENERATOR_BATCH_SIZE, :] = (trained_model.predict_on_batch(x_test_batch))[0]
                     if model_type != 'conv_lstm_bagged':
                         y_pred[0, test_i:test_i + GENERATOR_BATCH_SIZE, :] = trained_model.predict_on_batch(x_test_batch) #needs the entire output. #needs the entire output.
-                    if model_type == 'conv_lstm_bagged':
+                    if model_type == 'conv_lstm_bagged': #duplicated outputs. pick the first one.
                         y_truth[0, test_i:test_i + GENERATOR_BATCH_SIZE, :] = y_test_batch[0]
                     if model_type != 'conv_lstm_bagged':
                         y_truth[0, test_i:test_i + GENERATOR_BATCH_SIZE, :] = y_test_batch
@@ -430,19 +435,34 @@ if __name__ == "__main__":
                 ind_f3 = y_pred.shape[0] - 3 * GENERATOR_BATCH_SIZE
 
                 row_dict_scikit['seq_name'] = str(files[0])[:-4]
+                row_dict_scikit_raw['seq_name'] = str(files[0])[:-4]
                 row_dict_scikit['mse'] = mean_squared_error(y_true = y_truth, y_pred = y_pred,multioutput = 'uniform_average')
                 row_dict_scikit['mse_f3'] = mean_squared_error(y_true=y_truth[ind_f3:,:], y_pred=y_pred[ind_f3:,:],
                                                             multioutput='uniform_average')
+                raw_mse = list(mean_squared_error(y_true=y_truth, y_pred=y_pred,multioutput='raw_values'))
+                for flaw in range(0,len(raw_mse)):
+                    row_dict_scikit_raw['mse_' + str(flaw)] = raw_mse[flaw]
+                raw_mse_f3 = list(mean_squared_error(y_true=y_truth[ind_f3:,:], y_pred=y_pred[ind_f3:,:],multioutput='raw_values'))
+                for flaw in range(0, len(raw_mse_f3)):
+                    row_dict_scikit_raw['mse_f3_' + str(flaw)] = raw_mse_f3[flaw]
+
                 row_dict_scikit['mae'] = mean_absolute_error(y_true = y_truth, y_pred = y_pred,multioutput = 'uniform_average')
                 row_dict_scikit['mae_f3'] = mean_absolute_error(y_true=y_truth[ind_f3:,:], y_pred=y_pred[ind_f3:,:],
                                                             multioutput='uniform_average')
+                raw_mae = list(mean_absolute_error(y_true=y_truth, y_pred=y_pred,multioutput='raw_values'))
+                for flaw in range(0,len(raw_mae)):
+                    row_dict_scikit_raw['mae_' + str(flaw)] = raw_mae[flaw]
+                raw_mae_f3 = list(mean_absolute_error(y_true=y_truth[ind_f3:,:], y_pred=y_pred[ind_f3:,:],multioutput='raw_values'))
+                for flaw in range(0, len(raw_mae_f3)):
+                    row_dict_scikit_raw['mae_f3_' + str(flaw)] = raw_mae_f3[flaw]
                 # row_dict_scikit['msle'] = mean_squared_log_error(y_true=y_truth, y_pred=y_pred, multioutput='uniform_average')
                 # row_dict_scikit['msle_f3'] = mean_squared_log_error(y_true=y_truth[ind_f3:,:], y_pred=y_pred[ind_f3:,:],
                 #                                             multioutput='uniform_average')
 
                 score_rows_list_scikit.append(row_dict_scikit)
+                score_rows_list_scikit_raw.append(row_dict_scikit_raw)
 
-                print('row_dict sk keys: ', row_dict_scikit.keys(), "row dict sk values: ", row_dict_scikit.values())
+                #print('row_dict sk keys: ', row_dict_scikit.keys(), "row dict sk values: ", row_dict_scikit.values())
                 if save_preds == True:
                     np.save(analysis_path + 'preds/preds_' + identifier_post_training + str(files[0])[:-4] + '.npy',
                             arr=y_pred)
@@ -461,17 +481,20 @@ if __name__ == "__main__":
                 # resample_interval = 16
                 # label_truth = label_truth[::resample_interval, :]
                 # y_truth = y_truth[::resample_interval, :]
+            score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys())
+            score_scikit_df = pd.DataFrame(data=score_rows_list_scikit,columns=score_rows_list_scikit[0].keys())
+            score_scikit_raw_df = pd.DataFrame(data=score_rows_list_scikit_raw,columns=score_rows_list_scikit_raw[0].keys())
 
-            score_scikit_df = pd.DataFrame(data=score_rows_list_scikit,columns=score_rows_list_scikit[0].keys(),index='seq_name')
-            score_df = pd.DataFrame(data=score_rows_list, columns=score_rows_list[0].keys(),index='seq_name')
             if shuffle_testing_generator == False:
-                score_df.to_csv('scores_' + model_type + '_' + identifier_post_training + '.csv')
-                score_scikit_df.to_csv('scores_sk_' + model_type + '_' + identifier_post_training + '.csv')
-            if shuffle_testing_generator == True:
-                score_df.to_csv('scores_' + model_type + '_' +identifier_post_training + 'shf_test.csv')
-                score_scikit_df.to_csv('scores_sk_' + model_type + '_' + identifier_post_training + 'shf_test.csv')
-            # print(len(y_prediction))
+                score_df.to_csv(analysis_path + 'scores_' + model_type + '_' + str(model)[:-3] + '.csv')
+                score_scikit_df.to_csv(analysis_path + 'scores_sk_' + model_type + '_' + str(model)[:-3] + '.csv')
+                score_scikit_raw_df.to_csv(analysis_path + 'scores_sk_raw_' + model_type + '_' + str(model)[:-3] + '.csv')
 
+            if shuffle_testing_generator == True:
+                score_df.to_csv(analysis_path + 'scores_' + model_type + '_' + str(model)[:-3] + 'shf_test.csv')
+                score_scikit_df.to_csv(analysis_path + 'scores_sk_' + model_type + '_' + str(model)[:-3] + 'shf_test.csv')
+                score_scikit_raw_df.to_csv(analysis_path + 'scores_sk_' + model_type + '_' + str(model)[:-3] + 'shf_test.csv')
+            # print(len(y_prediction))
 
 
                 #move all this junk into the training loop.

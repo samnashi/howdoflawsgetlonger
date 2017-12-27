@@ -30,6 +30,7 @@ from sklearn.kernel_ridge import KernelRidge
 import time
 from sklearn.externals import joblib
 from sklearn.utils import check_array
+from sklearn.multioutput import MultiOutputRegressor
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
@@ -140,6 +141,8 @@ def generate_model_id(model_sklearn):
         dict = model_sklearn.get_params(deep=True)
         model_type = model_type
         model_identifier = model_type
+    if isinstance(model_sklearn, MultiOutputRegressor):
+        model_type = str(model_sklearn.estimator)
     return str(model_type)
 
 

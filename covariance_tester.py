@@ -119,8 +119,8 @@ for index_to_load in range(0,len(combined_filenames)):
     relevant_vars_array = aggregate_data_and_label(data_array = train_array,
                                                    label_array=label_train_array,
                                                    desired_colnum=desired_colnumber)
-    filename_cov = analysis_path + "cov_complete_" + identifier + ".csv"
-    filename_corr = analysis_path + "corrcoef_complete_" + identifier + ".csv"
+    filename_cov = analysis_path + "cov_complete_train_fv1c_" + identifier + ".csv"
+    filename_corr = analysis_path + "corrcoef_complete_train_fv1c_" + identifier + ".csv"
 
     X_cov = np.cov(relevant_vars_array, rowvar=False)
     X_corr = np.corrcoef(relevant_vars_array, rowvar=False)
