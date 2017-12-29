@@ -513,7 +513,7 @@ if __name__ == "__main__":
     #NARROW WINDOW: 32 pad. WIDE WINDOW: 128 pad.
     param_dict_HLR['GenPad'] = [128]
     param_dict_HLR['ConvAct']=['relu']
-    param_dict_HLR['DenseAct']=['tanh']
+    param_dict_HLR['DenseAct']=['sigmoid']
     param_dict_HLR['KernelReg']=[l1_l2()]
     param_dict_HLR['ConvBlockDepth'] = [3]
     param_dict_HLR['id_pre'] = [] #initialize to blank first
@@ -524,7 +524,7 @@ if __name__ == "__main__":
     for z in range(0, len(param_dict_HLR['BatchSize'])): #come up with a
         param_dict_HLR['id_pre'].append("HLR_" + str(z))
         #ca = conv activation, da = dense activation, cbd = conv block depth
-        id_post_temp = "_fv1c_64d_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
+        id_post_temp = "_fv1c_64d_hilr_" + str(param_dict_HLR['ConvAct'][z]) + "_ca_" + str(param_dict_HLR['DenseAct'][z]) + "_da_" + \
             str(param_dict_HLR['ConvBlockDepth'][z]) + "_cbd_" + str(param_dict_HLR['ScalerType'][z]) + "_sclr_"
         if param_dict_HLR['KernelReg'][z] != None:
             if (param_dict_HLR['KernelReg'][z].get_config())['l1'] != 0.0 and (param_dict_HLR['KernelReg'][z].get_config())['l2'] != 0.0:
@@ -561,7 +561,7 @@ if __name__ == "__main__":
         # !!!!!!!!!!!!!!!!!!!! TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK THESE FLAGS YO!!!!!!!!!!!!
         # shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
         num_epochs = 4  # individual. like how many times is the net trained on that sequence consecutively
-        num_sequence_draws = 300 # how many times the training corpus is sampled.
+        num_sequence_draws = 50 # how many times the training corpus is sampled.
         generator_batch_size = bs
         finetune = False
         test_only = False  # no training. if finetune is also on, this'll raise an error.
@@ -574,7 +574,7 @@ if __name__ == "__main__":
         base_seq_circumnav_amt = 0.75 #default value, the only one if adaptive circumnav is False
         adaptive_circumnav = True
         if adaptive_circumnav == True:
-            aux_circumnav_onset_draw = 200
+            aux_circumnav_onset_draw = 40
             assert(aux_circumnav_onset_draw < num_sequence_draws)
             aux_seq_circumnav_amt = 1.5 #only used if adaptive_circumnav is True
             assert(base_seq_circumnav_amt != None and aux_seq_circumnav_amt != None and aux_circumnav_onset_draw != None)
@@ -709,7 +709,7 @@ if __name__ == "__main__":
 
         model = Model(inputs=[a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11], outputs=out)
         plot_model(model, to_file=analysis_path + 'model_' + identifier_post_training + '.png', show_shapes=True)
-        optimizer_used = rmsprop(lr=0.0025)
+        optimizer_used = rmsprop(lr=0.0075)
         metrics_list = ['mae', 'mape', 'mse','msle']
         model.compile(loss='mse', optimizer=optimizer_used, metrics=metrics_list)
         print("Model summary: {}".format(model.summary()))

@@ -31,6 +31,7 @@ import time
 from sklearn.externals import joblib
 from sklearn.utils import check_array
 from sklearn.multioutput import MultiOutputRegressor
+from sklearn.linear_model import ElasticNet
 
 from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 
@@ -142,13 +143,13 @@ def generate_model_id(model_sklearn):
         model_type = model_type
         model_identifier = model_type
     if isinstance(model_sklearn, MultiOutputRegressor):
-        model_type = str(model_sklearn.estimator)
+        model_type = str('elasticnet')
     return str(model_type)
 
 
 if __name__ == "__main__":
 
-    num_sequence_draws = 200
+    num_sequence_draws = 50
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1  # because you gotta feed the base model the same way you fed it during training... (RNN commandments)
     save_preds = True
@@ -217,7 +218,9 @@ if __name__ == "__main__":
             #aux_reg_regressor = LinearRegression(n_jobs=-1)
             # aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
             #aux_reg_regressor = ExtraTreesRegressor(n_estimators=30,criterion='mae',n_jobs=2,warm_start=True)
-            aux_reg_regressor = RandomForestRegressor(n_estimators=30, criterion='mae', n_jobs=-1, warm_start=True)
+            #aux_reg_regressor = RandomForestRegressor(n_estimators=30, criterion='mae', n_jobs=-1, warm_start=True)
+            aux_reg_regressor = MultiOutputRegressor(estimator=ElasticNet(warm_start=True),
+                                                     n_jobs=1)
 
             model_id = generate_model_id(aux_reg_regressor)
             assert model_id != ""
@@ -416,5 +419,5 @@ if __name__ == "__main__":
     scores_combined_f3_df.set_axis(labels=name_list[1:], axis=1)
     scores_combined_f3_df.index.rename(name='seq_name',inplace=True)
 
-    scores_combined_df.to_csv("./analysis/combi_scores_f3_fv1c_" + model_id + "_mae_" + str(num_sequence_draws) + "sd.csv")
+    scores_combined_df.to_csv("./analysis/combi_scores_f3_fv1c_" + model_id + str(num_sequence_draws) + "sd.csv")
     print("model id: ",model_id)

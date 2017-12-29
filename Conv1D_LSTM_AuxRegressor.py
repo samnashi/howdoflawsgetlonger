@@ -127,14 +127,13 @@ if __name__ == "__main__":
             print("for fitting: feature shape: {}, uncut label shape: {}".format(base_model_output_2d.shape, label_array.shape))
 
             if i == 0: #initialize for the first time
-                #aux_reg_regressor = Ridge()
+                aux_reg_regressor = Ridge(solver='saga')
                 #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
                 #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
                 #aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True,oob_score=False)
                 #aux_reg_regressor = MultiOutputRegressor(estimator = GaussianProcessRegressor(random_state=1337),n_jobs=1) #MEMORY ERROR
-                aux_reg_regressor = MultiOutputRegressor(estimator=ElasticNet(warm_start=True),
-                                                         n_jobs=1)
+                #aux_reg_regressor = MultiOutputRegressor(estimator=ElasticNet(warm_start=True),n_jobs=1)
 
                 model_id = generate_model_id(aux_reg_regressor)
                 assert model_id != ""

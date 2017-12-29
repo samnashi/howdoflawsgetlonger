@@ -29,6 +29,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, median_abso
 from sklearn.kernel_ridge import KernelRidge
 import time
 from sklearn.externals import joblib
+from sklearn.linear_model import ElasticNet
+from sklearn.multioutput import MultiOutputRegressor
 
 #from Conv1D_LSTM_Ensemble import pair_generator_1dconv_lstm_bagged
 from LSTM_TimeDist import pair_generator_lstm
@@ -57,7 +59,7 @@ def create_lstm_model_list():
 
 if __name__ == "__main__":
 
-    num_sequence_draws = 5
+    num_sequence_draws = 20
     GENERATOR_BATCH_SIZE = 128
     num_epochs = 1 #because you gotta feed the base model the same way you fed it during training... (RNN commandments)
     save_preds = True
@@ -146,11 +148,12 @@ if __name__ == "__main__":
             print("for fitting: feature shape: {}, uncut label shape: {}, CUT label shape: {}".format(base_model_output_2d.shape, label_array.shape, label_array_to_fit.shape))
 
             if i == 0: #initialize for the first time
-                #aux_reg_regressor = Ridge()
+                #aux_reg_regressor = Ridge(solver='saga')
                 #aux_reg_regressor = LinearRegression()
                 #aux_reg_regressor = KernelRidge(alpha=1,kernel='polynomial',gamma=1.0e-3,)
-                #aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
-                aux_reg_regressor = RandomForestRegressor(n_estimators=5,criterion='mse',n_jobs=-1,warm_start=True)
+                aux_reg_regressor = ExtraTreesRegressor(n_estimators=5,criterion='mse',n_jobs=2,warm_start=True)
+                #aux_reg_regressor = RandomForestRegressor(n_estimators=30,criterion='mse',n_jobs=-1,warm_start=True)
+                #aux_reg_regressor = MultiOutputRegressor(estimator=ElasticNet(warm_start=True), n_jobs=1)
 
                 model_id = generate_model_id(aux_reg_regressor)
                 assert model_id != ""
@@ -327,4 +330,4 @@ if __name__ == "__main__":
     # r2_scores_df.to_csv("./analysis/r2_rf5a_" + str(model) + ".csv")
     # mse_scores_df.to_csv("./analysis/mse_rf5a_" + str(model) + ".csv")
     # mae_scores_df.to_csv("./analysis/mae_rf5a_" + str(model) + ".csv")
-    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(lstm_model)[:-3] + ".csv")
+    scores_combined_df.to_csv("./analysis/combi_scores_" + model_id + "_" + str(lstm_model)[:-3] + str(num_sequence_draws) + "sd.csv")

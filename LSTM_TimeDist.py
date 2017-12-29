@@ -251,7 +251,7 @@ if __name__ == "__main__":
     #!!!!!!!!!!!!!!!!!!!!!TRAINING SCHEME PARAMETERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #shortest_length = sg_utils.get_shortest_length()  #a suggestion. will also print the remainders.
     num_epochs = 3 #individual. like how many times is the net trained on that sequence consecutively
-    num_sequence_draws = 500 #how many times the training corpus is sampled.
+    num_sequence_draws = 100 #how many times the training corpus is sampled.
     generator_batch_size = 128
     finetune = False
     test_only = False #no training. if finetune is also on, this'll raise an error.
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     save_preds = True
     save_figs = False
     identifier_pre_training = '1200_small_l1_' #weights to initialize with, if fine tuning is on.
-    identifier_post_training = "_micro_bidir_" #weight name to save as
+    identifier_post_training = "_big_bidir_" #weight name to save as
     # @@@@@@@@@@@@@@ RELATIVE PATHS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     Base_Path = "./"
     image_path = "./images/"
@@ -311,7 +311,7 @@ if __name__ == "__main__":
 
     kr = l1_l2()
     a = Input(shape=(None,11))
-    lstm = reference_bilstm_nodense_micro(input_tensor=a, k_reg=kr, k_init='orthogonal', rec_reg=kr)
+    lstm = reference_bilstm_nodense_big(input_tensor=a, k_reg=kr, k_init='orthogonal', rec_reg=kr)
     d = TimeDistributed(Dense(64,activation='tanh',kernel_initializer=lecun_normal(seed=1337),kernel_regularizer=kr,name='dense_post_concat'),)(lstm)
     e = BatchNormalization(name='bn_final')(d)
     out = TimeDistributed(Dense(4,kernel_initializer=lecun_normal(seed=1337)))(e)
@@ -379,19 +379,18 @@ if __name__ == "__main__":
                                                               steps_per_epoch= 1 * (train_array.shape[0] // generator_batch_size),
                                                               callbacks = [csv_logger],verbose=2)
 
-        #model.save('Model_' + str(num_sequence_draws) + identifier + '.h5')
         if weights_present_indicator == True and finetune == True:
             print("fine-tuning/partial training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
-            model.save('./analysis/model_' + identifier_post_training + '.h5')
+            model.save('./analysis/model_lstm_' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         if weights_present_indicator == False and finetune == False:  # fresh training
             print("FRESH training session completed.")
             weights_file_name = 'Weights_' + str(num_sequence_draws) + identifier_post_training + '.h5'
             model.save_weights(weights_file_name)
-            model.save('./analysis/model_' + identifier_post_training + '.h5')
+            model.save('./analysis/model_lstm_' + identifier_post_training + '.h5')
             print("after {} iterations, model weights is saved as {}".format(num_sequence_draws * num_epochs,
                                                                              weights_file_name))
         else:  # TESTING ONLY! bypass weights present indicator.

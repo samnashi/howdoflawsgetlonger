@@ -113,7 +113,7 @@ if __name__ == "__main__":
     for model in model_filenames:
         identifier_post_training = model
         raw_base_model = load_model(models_path + model)
-        print("model loaded.")
+        print("model loaded, ", str(model))
 
         cond_conv = any(isinstance(layer, Conv1D) for layer in raw_base_model.layers)
         cond_lstm = any(isinstance(layer, LSTM) for layer in raw_base_model.layers)
