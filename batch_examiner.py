@@ -65,11 +65,11 @@ colnums_translator = ['percent_damage', 'delta_K_current_1', 'ctip_posn_curr_1',
                              'ctip_posn_curr_2', 'delta_K_current_3', 'ctip_posn_curr_3', 'delta_K_current_4',
                              'ctip_posn_curr_4', 'Load_1', 'Load_2','delta_a_current_1','delta_a_current_2','delta_a_current_3','delta_a_current_4']  # and seq_id,somehow
 
-for index_to_load in range(0, len(combined_test_filenames)):
-    files = combined_test_filenames[index_to_load]
+for index_to_load in range(0, len(combined_train_filenames)):
+    files = combined_train_filenames[index_to_load]
     print("files: {}".format(files))
-    test_seq_load_path = test_path + 'data/' + files[0]
-    test_label_load_path = test_path + 'label/' + files[1]
+    test_seq_load_path = train_path + 'data/' + files[0]
+    test_label_load_path = train_path + 'label/' + files[1]
     test_seq_temp = np.load(test_seq_load_path)
     test_labels = np.load(test_label_load_path)
     print("data/label shape: {}, {}".format(test_seq_temp.shape,test_labels.shape))
@@ -183,7 +183,7 @@ train_describe_result_df = pd.DataFrame.from_dict(batch_stats_dict, orient='inde
 print("len(colnames): {} len(flattened): {} colnames_list: {}".format(len(colnames_list),chunk_ndarray_flattened.shape,colnames_list))
 #assert(len(colnames_list) == chunk_ndarray_flattened.shape[0])
 
-train_describe_result_df.to_csv(analysis_path + 'test_corpus_describe_result3.csv',header=colnames_list)
+train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result4.csv',header=colnames_list)
 # except:
 #     print("writing the csv without headers.")
 #     train_describe_result_df.to_csv(analysis_path + 'train_corpus_describe_result.csv')
